@@ -2,104 +2,373 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>My IoT App</title>
-    
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#007bff">
-    
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="My IoT App">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORE BMS PRO - Firestore & Realtime Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f7f9;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            text-align: center;
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+        :root { --bg-color: #05070a; --card-bg: rgba(15, 18, 25, 0.8); }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: var(--bg-color); color: #e2e8f0;
+            background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, #05070a 100%);
+            min-height: 100vh;
         }
-
-        .container {
-            background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            width: 80%;
-            max-width: 400px;
-        }
-
-        h1 {
-            color: #333;
-            font-size: 1.5rem;
-        }
-
-        p {
-            color: #666;
-            margin-bottom: 2rem;
-        }
-
-        .btn {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        .btn:active {
-            background-color: #0056b3;
-            transform: scale(0.98);
-        }
-
-        #status-box {
-            margin-top: 20px;
-            font-size: 0.8rem;
-            color: #28a745;
-            font-weight: bold;
-        }
+        .glass-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 24px; padding: 1.25rem; }
+        .label-caps { font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em; color: #64748b; }
+        .value-mono { font-family: 'JetBrains Mono', monospace; }
+        .status-on { color: #10b981; text-shadow: 0 0 10px rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.3) !important; background: rgba(16, 185, 129, 0.05) !important; }
+        .status-off { color: #475569; }
+        canvas { min-height: 300px; width: 100% !important; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(20px); }
+        select { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); color: white; font-size: 10px; padding: 5px 10px; border-radius: 8px; outline: none; cursor: pointer; }
     </style>
 </head>
-<body>
+<body class="p-4 md:p-6">
 
-    <div class="container">
-        <h1>IoT Control Panel</h1>
-        <p>Aplikasi ini berjalan sebagai PWA di GitHub Pages.</p>
-        
-        <button class="btn" onclick="toggleLight()">Klik Saya</button>
-        
-        <div id="status-box">Menunggu perintah...</div>
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-6 flex justify-between items-end px-2">
+            <div>
+                <h1 class="text-3xl font-black tracking-tighter text-white uppercase">Core<span class="text-blue-500">.</span>BMS</h1>
+                <p class="label-caps opacity-50">Unified Telemetry System v4.8</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="openCfg()" class="glass-card !p-3 rounded-xl hover:bg-white/10 transition-all">⚙️</button>
+                <button id="connectBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-black text-xs transition-all shadow-lg shadow-blue-900/20 uppercase">Connect</button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <div class="glass-card col-span-1 md:col-span-2 row-span-2 flex flex-col justify-center items-center relative overflow-hidden">
+                <div class="absolute top-6 left-8 label-caps">State of Charge</div>
+                <h2 id="soc" class="text-[120px] font-black leading-none text-white tracking-tighter">0</h2>
+                <div class="grid grid-cols-2 gap-4 mt-4 w-full px-6 text-center border-t border-white/5 pt-6">
+                    <div><p class="label-caps">Current (A)</p><p id="current" class="value-mono text-2xl font-bold text-orange-400">0.00</p></div>
+                    <div><p class="label-caps">Power (W)</p><p id="power" class="value-mono text-2xl font-bold text-blue-400">0</p></div>
+                </div>
+            </div>
+
+            <div class="glass-card col-span-1 md:col-span-2">
+                <div class="flex justify-between items-center mb-4"><span class="label-caps">Cell Voltages</span><span id="vTotal" class="text-xl font-black value-mono text-white">0.00V</span></div>
+                <div class="grid grid-cols-4 gap-2">
+                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p class="label-caps !text-[7px] mb-1">C1</p><p id="v1" class="value-mono text-sm font-bold">0.00</p></div>
+                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p class="label-caps !text-[7px] mb-1">C2</p><p id="v2" class="value-mono text-sm font-bold">0.00</p></div>
+                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p class="label-caps !text-[7px] mb-1">C3</p><p id="v3" class="value-mono text-sm font-bold">0.00</p></div>
+                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p class="label-caps !text-[7px] mb-1">C4</p><p id="v4" class="value-mono text-sm font-bold">0.00</p></div>
+                </div>
+            </div>
+
+            <div class="glass-card col-span-1 md:col-span-2">
+                <span class="label-caps">Energy Management</span>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-center">
+                    <div class="bg-white/5 p-2 rounded-xl"><p class="label-caps !text-[7px] opacity-50">Wh Design</p><p id="whDesign" class="text-xs font-bold value-mono">0</p></div>
+                    <div class="bg-white/5 p-2 rounded-xl border border-blue-500/20"><p class="label-caps !text-[7px] text-blue-400">Wh Now</p><p id="whNow" class="text-xs font-bold value-mono">0</p></div>
+                    <div class="bg-white/5 p-2 rounded-xl"><p class="label-caps !text-[7px] opacity-50">Ah Design</p><p id="ahDesign" class="text-xs font-bold value-mono">0.0</p></div>
+                    <div class="bg-white/5 p-2 rounded-xl border border-blue-500/20"><p class="label-caps !text-[7px] text-blue-400">Ah Now</p><p id="ahNow" class="text-xs font-bold value-mono">0.0</p></div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <span class="label-caps text-red-400">Thermals</span>
+                <div class="flex justify-between items-end mt-4">
+                    <div><p class="label-caps !text-[7px]">Mosfet</p><p id="tMos" class="text-2xl font-bold value-mono">0°C</p></div>
+                    <div class="text-right"><p class="label-caps !text-[7px]">Battery</p><p id="tBatt" class="text-2xl font-bold value-mono text-orange-400">0°C</p></div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <span class="label-caps text-emerald-400">Switch Status</span>
+                <div class="flex flex-col gap-2 mt-4">
+                    <div id="rChg" class="status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase">Charging</div>
+                    <div id="rDis" class="status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase">Discharge</div>
+                </div>
+            </div>
+
+            <div class="glass-card col-span-1 md:col-span-4 mt-2">
+                <div class="flex justify-between items-center mb-4 px-2">
+                    <div class="flex items-center gap-4">
+                        <span class="label-caps">Historical Analytics</span>
+                        <select id="chartDuration" onchange="window.handleDurationChange()">
+                            <option value="live">Live (Realtime)</option>
+                            <option value="12h">Last 12 Hours</option>
+                            <option value="24h">Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-4 text-[8px] font-bold">
+                        <span class="text-blue-500">● WATT</span> <span class="text-emerald-500">● VOLT</span> 
+                        <span class="text-orange-500">● AMP</span> <span class="text-red-500">● TEMP</span>
+                    </div>
+                </div>
+                <div class="h-[300px]"><canvas id="unifiedChart"></canvas></div>
+            </div>
+
+            <div class="glass-card col-span-1 md:col-span-2">
+                <span class="label-caps">Usage Stats</span>
+                <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div><p class="label-caps !text-[7px] text-emerald-500">Wh Charge (+)</p><p id="whPos" class="text-lg font-bold value-mono">0</p></div>
+                    <div><p class="label-caps !text-[7px] text-red-500">Wh Disch (-)</p><p id="whNeg" class="text-lg font-bold value-mono">0</p></div>
+                </div>
+                <div class="mt-4 flex justify-between items-center border-t border-white/5 pt-4">
+                    <div><p class="label-caps">Cycles</p><p id="cycles" class="text-xl font-bold value-mono">0</p></div>
+                    <div class="text-right"><p class="label-caps">SOH</p><p id="soh" class="text-xl font-bold text-emerald-500 value-mono">0%</p></div>
+                </div>
+            </div>
+
+            <div class="glass-card col-span-1 md:col-span-2">
+                <span class="label-caps">Capacity Lifecycle</span>
+                <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div><p class="label-caps !text-[7px]">Cap Charged</p><p id="capChg" class="text-xl font-bold value-mono text-blue-400">0.0 Ah</p></div>
+                    <div><p class="label-caps !text-[7px]">Cap Discharged</p><p id="capDis" class="text-xl font-bold value-mono text-orange-400">0.0 Ah</p></div>
+                </div>
+                <div class="mt-4 border-t border-white/5 pt-4">
+                    <p class="label-caps">Total Lifetime Usage</p><p id="usagePer" class="text-xl font-bold value-mono">0%</p>
+                </div>
+            </div>
+
+            <div id="errorCard" class="glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div id="statusDot" class="h-4 w-4 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></div>
+                    <div><span class="label-caps">Security Status</span><h3 id="errText" class="text-xl font-black text-emerald-500 italic uppercase tracking-tighter">System Secure</h3></div>
+                </div>
+                <div class="flex flex-col">
+                    <span class="label-caps !text-[7px] mb-2">Security Event Log (Last 5)</span>
+                    <div id="errHistory" class="flex gap-2">
+                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
+                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
+                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
+                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
+                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-8 flex flex-col md:flex-row justify-between items-center opacity-30 text-[8px] font-bold uppercase tracking-[0.3em] gap-4">
+            <div id="lastSync">Sync: Waiting for Device...</div>
+            <div id="cloudStatus">Cloud: Offline</div>
+            <div>BMS.CORE V4.8 - Dual Cloud Protocol</div>
+        </footer>
     </div>
 
-    <script>
-        // Logika sederhana untuk tombol
-        function toggleLight() {
-            const status = document.getElementById('status-box');
-            status.innerText = "Perintah Terkirim!";
-            status.style.color = "#007bff";
-            setTimeout(() => {
-                status.innerText = "Standby";
-                status.style.color = "#28a745";
-            }, 2000);
+    <div id="configModal" class="modal">
+        <div class="glass-card w-full max-w-xl mx-4 p-8 border-white/10">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black italic text-white uppercase">Cloud<span class="text-blue-500">Config</span></h2>
+                <button onclick="closeCfg()" class="text-slate-500 hover:text-white">✕</button>
+            </div>
+            <p class="label-caps mb-2 text-blue-400">Firebase Config JSON</p>
+            <textarea id="fbInput" class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] value-mono text-emerald-400 outline-none mb-6" placeholder='{"apiKey": "...", "databaseURL": "...", "projectId": "...", ...}'></textarea>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button onclick="saveCfg()" class="col-span-2 bg-blue-600 py-4 rounded-xl font-black text-xs hover:bg-blue-500 uppercase">Apply Dual Cloud</button>
+                <button onclick="exportCfg()" class="bg-white/5 py-4 rounded-xl font-black text-[9px] hover:bg-white/10 uppercase">Export</button>
+                <button onclick="importCfg()" class="bg-white/5 py-4 rounded-xl font-black text-[9px] hover:bg-white/10 uppercase">Import</button>
+            </div>
+            <input type="file" id="importFile" class="hidden" accept=".json">
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getDatabase, ref as rRef, set } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
+        import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, limit } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+        // --- GLOBAL VARIABLES ---
+        let rtdb = null, firestore = null;
+        let rxChar, txChar, buffer = new Uint8Array(0);
+        window.bmsState = { v:0, a:0, w:0, soc:0, t:0 };
+        let liveMode = true;
+
+        // --- CHART SETUP ---
+        const ctx = document.getElementById('unifiedChart').getContext('2d');
+        const unifiedChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Watt', data: [], borderColor: '#3b82f6', borderWidth: 2, tension: 0.4, pointRadius: 0 },
+                    { label: 'Volt', data: [], borderColor: '#10b981', borderWidth: 2, tension: 0.4, pointRadius: 0 },
+                    { label: 'Amp', data: [], borderColor: '#f59e0b', borderWidth: 2, tension: 0.4, pointRadius: 0 },
+                    { label: 'Temp', data: [], borderColor: '#ef4444', borderWidth: 2, tension: 0.4, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    x: { display: false }, 
+                    y: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#475569', font: { size: 9 } } } 
+                }
+            }
+        });
+
+        // --- FIREBASE INITIALIZE ---
+        const saved = localStorage.getItem('bms_v48_cloud');
+        if(saved) {
+            try { 
+                const config = JSON.parse(saved);
+                const app = initializeApp(config);
+                rtdb = getDatabase(app);
+                firestore = getFirestore(app);
+                document.getElementById('fbInput').value = saved;
+                document.getElementById('cloudStatus').innerText = "Cloud: Dual-Sync Active";
+                document.getElementById('cloudStatus').className = "text-emerald-500 font-bold";
+            } catch(e) { console.error("Firebase Init Error:", e); }
         }
 
-        // --- REGISTER SERVICE WORKER ---
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('SW Registered!', reg))
-                    .catch(err => console.log('SW Registration Failed', err));
-            });
+        // --- BLUETOOTH LOGIC ---
+        document.getElementById('connectBtn').onclick = async () => {
+            try {
+                const device = await navigator.bluetooth.requestDevice({ 
+                    acceptAllDevices: true, 
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] 
+                });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                rxChar = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                txChar = await service.getCharacteristic('0000ffe2-0000-1000-8000-00805f9b34fb');
+                
+                await rxChar.startNotifications();
+                rxChar.addEventListener('characteristicvaluechanged', (e) => {
+                    const chunk = new Uint8Array(e.target.value.buffer);
+                    let temp = new Uint8Array(buffer.length + chunk.length);
+                    temp.set(buffer); temp.set(chunk, buffer.length); buffer = temp;
+                    while (buffer.length > 0) {
+                        const h = buffer[0];
+                        let len = (h === 0xAA) ? 46 : (h === 0xCC) ? 50 : (h === 0xEE) ? 8 : 0;
+                        if (len === 0 || buffer.length < len) break;
+                        parse(buffer.slice(0, len), h);
+                        buffer = buffer.slice(len);
+                    }
+                });
+                document.getElementById('connectBtn').innerText = "Connected";
+                document.getElementById('connectBtn').className = "bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase";
+                startPolling();
+            } catch(e) { alert("BT: " + e); }
+        };
+
+        function parse(pkt, head) {
+            const data = pkt.slice(1, -1);
+            const dv = new DataView(data.buffer);
+            const f = [];
+            if(head !== 0xEE) for(let i=0; i<data.length; i+=4) f.push(dv.getFloat32(i, true));
+
+            if (head === 0xAA) {
+                update('vTotal', f[0].toFixed(2)+'V');
+                update('v1', f[1].toFixed(2)); update('v2', f[2].toFixed(2));
+                update('v3', f[3].toFixed(2)); update('v4', f[4].toFixed(2));
+                update('current', f[5].toFixed(2));
+                update('power', f[6].toFixed(0));
+                update('ahDesign', f[7].toFixed(1));
+                update('soc', f[8].toFixed(0));
+                update('whNow', f[9].toFixed(0));
+                update('whDesign', f[10].toFixed(0));
+                Object.assign(window.bmsState, { v:f[0], a:f[5], w:f[6], soc:f[8] });
+            } 
+            else if (head === 0xCC) {
+                update('tMos', f[0].toFixed(1)); update('tBatt', f[1].toFixed(1));
+                update('ahNow', f[2].toFixed(1)); update('capChg', f[3].toFixed(2)); update('capDis', f[4].toFixed(2));
+                relay('rChg', f[5]); relay('rDis', f[6]);
+                update('soh', f[7].toFixed(0)+'%'); update('whPos', f[8].toFixed(0));
+                update('whNeg', f[9].toFixed(0)); update('cycles', f[10].toFixed(0));
+                update('usagePer', f[11].toFixed(0)+'%');
+
+                window.bmsState.t = f[1];
+
+                // Live Graph Update
+                if(liveMode) {
+                    if(unifiedChart.data.labels.length > 50) { 
+                        unifiedChart.data.labels.shift(); 
+                        unifiedChart.data.datasets.forEach(d => d.data.shift()); 
+                    }
+                    unifiedChart.data.labels.push("");
+                    unifiedChart.data.datasets[0].data.push(window.bmsState.w);
+                    unifiedChart.data.datasets[1].data.push(window.bmsState.v);
+                    unifiedChart.data.datasets[2].data.push(window.bmsState.a);
+                    unifiedChart.data.datasets[3].data.push(f[1]);
+                    unifiedChart.update('none');
+                }
+
+                // --- DUAL CLOUD SYNC ---
+                const ts = Date.now();
+                // 1. Realtime DB Sync (For Live Remote View)
+                if(rtdb) set(rRef(rtdb, 'bms_live'), { ...window.bmsState, ts });
+                // 2. Firestore Sync (For Long-term History)
+                if(firestore) addDoc(collection(firestore, "bms_history"), { ...window.bmsState, ts });
+            }
+            else if (head === 0xEE) {
+                const cur = pkt[1];
+                const hist = Array.from(pkt.slice(2, 7));
+                update('errText', cur === 0 ? "System Secure" : "Warning Alert");
+                const card = document.getElementById('errorCard');
+                card.className = cur > 0 ? "glass-card col-span-1 md:col-span-4 border-l-4 border-l-red-500 flex flex-col md:flex-row md:items-center justify-between gap-4" : "glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 flex flex-col md:flex-row md:items-center justify-between gap-4";
+                document.getElementById('errHistory').innerHTML = hist.map(h => `<div class="h-8 w-10 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-[10px] value-mono ${h>0?'text-red-400 border-red-500/30':'text-slate-600'}">${h || '-'}</div>`).join('');
+            }
+            document.getElementById('lastSync').innerText = "Sync: " + new Date().toLocaleTimeString();
         }
+
+        // --- FIRESTORE HISTORY FETCH ---
+        window.handleDurationChange = async () => {
+            const mode = document.getElementById('chartDuration').value;
+            if (mode === 'live') { liveMode = true; return; }
+            liveMode = false;
+
+            if (!firestore) return alert("Firestore is not configured!");
+            
+            const now = Date.now();
+            let start;
+            if (mode === '12h') start = now - (12*3600000);
+            else if (mode === '24h') start = now - (24*3600000);
+            else if (mode === '7d') start = now - (7*86400000);
+            else if (mode === '30d') start = now - (30*86400000);
+
+            const q = query(collection(firestore, "bms_history"), where("ts", ">=", start), orderBy("ts", "asc"));
+            const snap = await getDocs(q);
+            
+            unifiedChart.data.labels = [];
+            unifiedChart.data.datasets.forEach(d => d.data = []);
+
+            snap.forEach((doc) => {
+                const d = doc.data();
+                const time = new Date(d.ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                unifiedChart.data.labels.push(time);
+                unifiedChart.data.datasets[0].data.push(d.w);
+                unifiedChart.data.datasets[1].data.push(d.v);
+                unifiedChart.data.datasets[2].data.push(d.a);
+                unifiedChart.data.datasets[3].data.push(d.t);
+            });
+            unifiedChart.update();
+        };
+
+        // --- UTILS ---
+        function update(id, v) { const e = document.getElementById(id); if(e) e.innerText = v; }
+        function relay(id, v) { 
+            const e = document.getElementById(id); 
+            if(v > 0.5) { e.className = "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase"; }
+            else { e.className = "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase"; }
+        }
+        window.openCfg = () => document.getElementById('configModal').style.display = 'flex';
+        window.closeCfg = () => document.getElementById('configModal').style.display = 'none';
+        window.saveCfg = () => { localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); location.reload(); };
+        window.exportCfg = () => {
+            const blob = new Blob([localStorage.getItem('bms_v48_cloud')], {type:'application/json'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'bms_config_v48.json'; a.click();
+        };
+        window.importCfg = () => document.getElementById('importFile').click();
+        document.getElementById('importFile').onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (re) => { localStorage.setItem('bms_v48_cloud', re.target.result); location.reload(); };
+            reader.readAsText(e.target.files[0]);
+        };
+        function startPolling() { 
+            setInterval(() => send('VA'), 2000); 
+            setTimeout(() => setInterval(() => send('PT'), 2000), 500);
+            setTimeout(() => setInterval(() => send('ER'), 5000), 1000);
+        }
+        async function send(c) { if(!txChar) return; await txChar.writeValue(new Uint8Array([0xBB, c.charCodeAt(0), c.charCodeAt(1), 0xBB ^ c.charCodeAt(0) ^ c.charCodeAt(1)])); }
     </script>
 </body>
 </html>
