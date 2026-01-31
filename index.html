@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORE BMS PRO - Firestore & Realtime Sync</title>
+    <title>CORE BMS PRO - Unified 29-Param Telemetry</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
         :root { --bg-color: #05070a; --card-bg: rgba(15, 18, 25, 0.8); }
@@ -20,7 +21,7 @@
         .value-mono { font-family: 'JetBrains Mono', monospace; }
         .status-on { color: #10b981; text-shadow: 0 0 10px rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.3) !important; background: rgba(16, 185, 129, 0.05) !important; }
         .status-off { color: #475569; }
-        canvas { min-height: 300px; width: 100% !important; }
+        canvas { min-height: 350px; width: 100% !important; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(20px); }
         select { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); color: white; font-size: 10px; padding: 5px 10px; border-radius: 8px; outline: none; cursor: pointer; }
     </style>
@@ -31,7 +32,7 @@
         <header class="mb-6 flex justify-between items-end px-2">
             <div>
                 <h1 class="text-3xl font-black tracking-tighter text-white uppercase">Core<span class="text-blue-500">.</span>BMS</h1>
-                <p class="label-caps opacity-50">Unified Telemetry System v4.8</p>
+                <p class="label-caps opacity-50">Unified Telemetry System v5.5 (Full 29-Param Sync)</p>
             </div>
             <div class="flex gap-2">
                 <button onclick="openCfg()" class="glass-card !p-3 rounded-xl hover:bg-white/10 transition-all">⚙️</button>
@@ -40,7 +41,6 @@
         </header>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            
             <div class="glass-card col-span-1 md:col-span-2 row-span-2 flex flex-col justify-center items-center relative overflow-hidden">
                 <div class="absolute top-6 left-8 label-caps">State of Charge</div>
                 <h2 id="soc" class="text-[120px] font-black leading-none text-white tracking-tighter">0</h2>
@@ -89,21 +89,24 @@
             <div class="glass-card col-span-1 md:col-span-4 mt-2">
                 <div class="flex justify-between items-center mb-4 px-2">
                     <div class="flex items-center gap-4">
-                        <span class="label-caps">Historical Analytics</span>
+                        <span class="label-caps">Analytics Multi-Stream</span>
                         <select id="chartDuration" onchange="window.handleDurationChange()">
                             <option value="live">Live (Realtime)</option>
                             <option value="12h">Last 12 Hours</option>
                             <option value="24h">Last 24 Hours</option>
                             <option value="7d">Last 7 Days</option>
-                            <option value="30d">Last 30 Days</option>
                         </select>
                     </div>
-                    <div class="flex gap-4 text-[8px] font-bold">
-                        <span class="text-blue-500">● WATT</span> <span class="text-emerald-500">● VOLT</span> 
-                        <span class="text-orange-500">● AMP</span> <span class="text-red-500">● TEMP</span>
+                    <div class="flex flex-wrap gap-3 text-[7px] font-bold">
+                        <span class="text-blue-500">● POWER</span> 
+                        <span class="text-emerald-500">● VOLT</span> 
+                        <span class="text-orange-400">● AMPERE</span> 
+                        <span class="text-red-500">● T-MOS</span> 
+                        <span class="text-yellow-500">● T-BATT</span>
+                        <span id="syncBadge" class="text-emerald-500 ml-2">● RTDB READY</span>
                     </div>
                 </div>
-                <div class="h-[300px]"><canvas id="unifiedChart"></canvas></div>
+                <div class="h-[350px]"><canvas id="unifiedChart"></canvas></div>
             </div>
 
             <div class="glass-card col-span-1 md:col-span-2">
@@ -137,11 +140,11 @@
                 <div class="flex flex-col">
                     <span class="label-caps !text-[7px] mb-2">Security Event Log (Last 5)</span>
                     <div id="errHistory" class="flex gap-2">
-                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
-                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
-                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
-                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
-                        <div class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-600 border border-white/5">-</div>
+                        <div id="e1" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
+                        <div id="e2" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
+                        <div id="e3" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
+                        <div id="e4" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
+                        <div id="e5" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
                     </div>
                 </div>
             </div>
@@ -150,74 +153,85 @@
         <footer class="mt-8 flex flex-col md:flex-row justify-between items-center opacity-30 text-[8px] font-bold uppercase tracking-[0.3em] gap-4">
             <div id="lastSync">Sync: Waiting for Device...</div>
             <div id="cloudStatus">Cloud: Offline</div>
-            <div>BMS.CORE V4.8 - Dual Cloud Protocol</div>
+            <div>BMS.CORE V5.5 - FULL PARAMETER PROTOCOL</div>
         </footer>
     </div>
 
     <div id="configModal" class="modal">
         <div class="glass-card w-full max-w-xl mx-4 p-8 border-white/10">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black italic text-white uppercase">Cloud<span class="text-blue-500">Config</span></h2>
+                <h2 class="text-2xl font-black italic text-white uppercase">RTDB<span class="text-blue-500">Config</span></h2>
                 <button onclick="closeCfg()" class="text-slate-500 hover:text-white">✕</button>
             </div>
             <p class="label-caps mb-2 text-blue-400">Firebase Config JSON</p>
-            <textarea id="fbInput" class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] value-mono text-emerald-400 outline-none mb-6" placeholder='{"apiKey": "...", "databaseURL": "...", "projectId": "...", ...}'></textarea>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <button onclick="saveCfg()" class="col-span-2 bg-blue-600 py-4 rounded-xl font-black text-xs hover:bg-blue-500 uppercase">Apply Dual Cloud</button>
-                <button onclick="exportCfg()" class="bg-white/5 py-4 rounded-xl font-black text-[9px] hover:bg-white/10 uppercase">Export</button>
-                <button onclick="importCfg()" class="bg-white/5 py-4 rounded-xl font-black text-[9px] hover:bg-white/10 uppercase">Import</button>
+            <textarea id="fbInput" class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] value-mono text-emerald-400 outline-none mb-6" placeholder='{ "apiKey": "...", "databaseURL": "..." }'></textarea>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="saveCfg()" class="bg-blue-600 py-4 rounded-xl font-black text-xs hover:bg-blue-500 uppercase">Save Config</button>
+                <button onclick="closeCfg()" class="bg-white/5 py-4 rounded-xl font-black text-[9px] hover:bg-white/10 uppercase">Cancel</button>
             </div>
-            <input type="file" id="importFile" class="hidden" accept=".json">
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getDatabase, ref as rRef, set } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
-        import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, limit } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { getDatabase, ref, set, push, query, orderByChild, startAt, get } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
-        // Fungsi untuk menjaga layar tetap menyala
-let wakeLock = null;
 
-const requestWakeLock = async () => {
+
+
+
+
+
+        // --- OFFLINE DB ---
+        const db = new Dexie("BMS_Offline_v2");
+        db.version(1).stores({ logs: '++id, ts, synced' });
+
+        // --- GLOBALS ---
+        let rtdb = null;
+        let rxChar, txChar, buffer = new Uint8Array(0);
+        let wakeLock = null;
+        let isOnline = navigator.onLine;
+        let liveMode = true;
+        
+
+        async function requestWakeLock() {
     try {
-        // Hanya jalankan jika browser mendukung Wake Lock API
+        // Hanya jalankan jika browser mendukung
         if ('wakeLock' in navigator) {
             wakeLock = await navigator.wakeLock.request('screen');
-            console.log('Wake Lock aktif: Layar akan tetap menyala');
-
-            // Jika koneksi terputus (misal pindah tab), minta lagi saat kembali
+            console.log('Wake Lock is active');
+            
+            // Event listener jika wake lock terlepas (misal: karena pindah tab)
             wakeLock.addEventListener('release', () => {
-                console.log('Wake Lock dilepas');
+                console.log('Wake Lock was released');
             });
         }
     } catch (err) {
         console.error(`${err.name}, ${err.message}`);
     }
-};
-
-// Panggil fungsi ini tepat setelah koneksi Bluetooth berhasil
-// Cari baris document.getElementById('connectBtn').onclick... 
-// Lalu tambahkan requestWakeLock() di dalamnya.
+}
 
 
-        // --- GLOBAL VARIABLES ---
-        let rtdb = null, firestore = null;
-        let rxChar, txChar, buffer = new Uint8Array(0);
-        window.bmsState = { v:0, a:0, w:0, soc:0, t:0 };
-        let liveMode = true;
+
+        // Objek 29 Parameter (VA:11, PT:12, ER:6)
+        window.bmsState = { 
+            v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, // VA
+            tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0, // PT
+            err:0, e1:0, e2:0, e3:0, e4:0, e5:0 // ER
+        };
 
         // --- CHART SETUP ---
         const ctx = document.getElementById('unifiedChart').getContext('2d');
         const unifiedChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [],
+                labels: Array(50).fill(''),
                 datasets: [
-                    { label: 'Watt', data: [], borderColor: '#3b82f6', borderWidth: 2, tension: 0.4, pointRadius: 0 },
-                    { label: 'Volt', data: [], borderColor: '#10b981', borderWidth: 2, tension: 0.4, pointRadius: 0 },
-                    { label: 'Amp', data: [], borderColor: '#f59e0b', borderWidth: 2, tension: 0.4, pointRadius: 0 },
-                    { label: 'Temp', data: [], borderColor: '#ef4444', borderWidth: 2, tension: 0.4, pointRadius: 0 }
+                    { label: 'Power', data: [], borderColor: '#3b82f6', borderWidth: 2, tension: 0.4, pointRadius: 0, yAxisID: 'y' },
+                    { label: 'Volt', data: [], borderColor: '#10b981', borderWidth: 2, tension: 0.4, pointRadius: 0, yAxisID: 'y' },
+                    { label: 'Ampere', data: [], borderColor: '#fb923c', borderWidth: 2, tension: 0.4, pointRadius: 0, yAxisID: 'y1' },
+                    { label: 'T-Mos', data: [], borderColor: '#ef4444', borderWidth: 1.5, borderDash: [5,5], tension: 0.4, pointRadius: 0, yAxisID: 'y1' },
+                    { label: 'T-Batt', data: [], borderColor: '#eab308', borderWidth: 1.5, borderDash: [5,5], tension: 0.4, pointRadius: 0, yAxisID: 'y1' }
                 ]
             },
             options: {
@@ -225,7 +239,8 @@ const requestWakeLock = async () => {
                 plugins: { legend: { display: false } },
                 scales: { 
                     x: { display: false }, 
-                    y: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#475569', font: { size: 9 } } } 
+                    y: { position: 'left', grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#475569', font: { size: 9 } } },
+                    y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#64748b', font: { size: 8 } } }
                 }
             }
         });
@@ -237,13 +252,132 @@ const requestWakeLock = async () => {
                 const config = JSON.parse(saved);
                 const app = initializeApp(config);
                 rtdb = getDatabase(app);
-                firestore = getFirestore(app);
                 document.getElementById('fbInput').value = saved;
-                document.getElementById('cloudStatus').innerText = "Cloud: Dual-Sync Active";
+                document.getElementById('cloudStatus').innerText = "Cloud: RTDB Active";
                 document.getElementById('cloudStatus').className = "text-emerald-500 font-bold";
             } catch(e) { console.error("Firebase Init Error:", e); }
         }
 
+        // --- TELEMETRY & SYNC ---
+        async function processTelemetry(data) {
+            const ts = Date.now();
+            const entry = { ...data, ts };
+
+            if(liveMode) {
+                if(unifiedChart.data.datasets[0].data.length > 50) {
+                    unifiedChart.data.datasets.forEach(d => d.data.shift());
+                    unifiedChart.data.labels.shift();
+                }
+                unifiedChart.data.labels.push("");
+                unifiedChart.data.datasets[0].data.push(data.p);
+                unifiedChart.data.datasets[1].data.push(data.v);
+                unifiedChart.data.datasets[2].data.push(data.a);
+                unifiedChart.data.datasets[3].data.push(data.tM);
+                unifiedChart.data.datasets[4].data.push(data.tB);
+                unifiedChart.update('none');
+            }
+
+            await db.logs.add({ ...entry, synced: 0 });
+
+            if(isOnline && rtdb) {
+                set(ref(rtdb, 'bms_live'), entry);
+                syncOfflineData();
+            }
+            updateSyncBadge();
+        }
+
+        async function syncOfflineData() {
+            if(!isOnline || !rtdb) return;
+            const pending = await db.logs.where('synced').equals(0).limit(20).toArray();
+            for(const item of pending) {
+                try {
+                    const { id, synced, ...fullData } = item;
+                    await push(ref(rtdb, 'bms_history'), fullData);
+                    await db.logs.update(item.id, { synced: 1 });
+                } catch(e) { break; }
+            }
+            await db.logs.where('synced').equals(1).delete();
+        }
+
+        async function updateSyncBadge() {
+            const count = await db.logs.where('synced').equals(0).count();
+            const badge = document.getElementById('syncBadge');
+            if(count > 0) {
+                badge.innerText = `● QUEUE: ${count}`;
+                badge.className = "text-orange-500 animate-pulse";
+            } else {
+                badge.innerText = `● RTDB READY`;
+                badge.className = "text-emerald-500";
+            }
+        }
+
+        // --- BLUETOOTH & PARSING ---
+        function parse(pkt, head) {
+            const data = pkt.slice(1, -1);
+            const dv = new DataView(data.buffer);
+            const f = [];
+            if(head !== 0xEE) for(let i=0; i<data.length; i+=4) f.push(dv.getFloat32(i, true));
+
+            if (head === 0xAA) { // VA Data (11)
+                update('vTotal', f[0].toFixed(2)+'V');
+                update('v1', f[1].toFixed(2)); update('v2', f[2].toFixed(2));
+                update('v3', f[3].toFixed(2)); update('v4', f[4].toFixed(2));
+                update('current', f[5].toFixed(2));
+                update('power', f[6].toFixed(0));
+                update('ahDesign', f[7].toFixed(1));
+                update('soc', f[8].toFixed(0));
+                update('whNow', f[9].toFixed(0));
+                update('whDesign', f[10].toFixed(0));
+                Object.assign(window.bmsState, { v:f[0], v1:f[1], v2:f[2], v3:f[3], v4:f[4], a:f[5], p:f[6], ahD:f[7], soc:f[8], whN:f[9], whD:f[10] });
+            } 
+            else if (head === 0xCC) { // PT Data (12)
+                update('tMos', f[0].toFixed(1)+'°C'); update('tBatt', f[1].toFixed(1)+'°C');
+                update('ahNow', f[2].toFixed(1)); update('capChg', f[3].toFixed(2)+' Ah'); update('capDis', f[4].toFixed(2)+' Ah');
+                relay('rChg', f[5]); relay('rDis', f[6]);
+                update('soh', f[7].toFixed(0)+'%'); update('whPos', f[8].toFixed(0));
+                update('whNeg', f[9].toFixed(0)); update('cycles', f[10].toFixed(0));
+                update('usagePer', f[11].toFixed(0)+'%');
+                Object.assign(window.bmsState, { tM:f[0], tB:f[1], ahN:f[2], cChg:f[3], cDis:f[4], rC:f[5], rD:f[6], soh:f[7], wP:f[8], wN:f[9], cyc:f[10], uP:f[11] });
+                
+                // Trigger Sync setelah paket data utama lengkap
+                processTelemetry(window.bmsState);
+            }
+            else if (head === 0xEE) { // ER Data (6)
+                const err = pkt[1];
+                update('errText', err === 0 ? "System Secure" : "Warning Alert");
+                update('e1', pkt[2]); update('e2', pkt[3]); update('e3', pkt[4]); update('e4', pkt[5]); update('e5', pkt[6]);
+                const card = document.getElementById('errorCard');
+                card.className = err > 0 ? "glass-card col-span-1 md:col-span-4 border-l-4 border-l-red-500 ..." : "glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 ...";
+                Object.assign(window.bmsState, { err:pkt[1], e1:pkt[2], e2:pkt[3], e3:pkt[4], e4:pkt[5], e5:pkt[6] });
+            }
+            document.getElementById('lastSync').innerText = "Sync: " + new Date().toLocaleTimeString();
+        }
+
+        // --- UTILS & HANDLERS ---
+        window.handleDurationChange = async () => {
+            const mode = document.getElementById('chartDuration').value;
+            if (mode === 'live') { liveMode = true; return; }
+            liveMode = false;
+            if (!rtdb) return alert("Firebase not configured!");
+            
+            const now = Date.now();
+            let start = now - (12*3600000);
+            if(mode === '24h') start = now - 86400000;
+            if(mode === '7d') start = now - 604800000;
+
+            const snap = await get(query(ref(rtdb, 'bms_history'), orderByChild('ts'), startAt(start)));
+            unifiedChart.data.labels = []; unifiedChart.data.datasets.forEach(d => d.data = []);
+            if(snap.exists()) {
+                snap.forEach(c => {
+                    const d = c.val();
+                    unifiedChart.data.labels.push(new Date(d.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+                    unifiedChart.data.datasets[0].data.push(d.p); unifiedChart.data.datasets[1].data.push(d.v);
+                    unifiedChart.data.datasets[2].data.push(d.a); unifiedChart.data.datasets[3].data.push(d.tM);
+                    unifiedChart.data.datasets[4].data.push(d.tB);
+                });
+            }
+            unifiedChart.update();
+        };
 
         document.addEventListener('visibilitychange', async () => {
     if (wakeLock !== null && document.visibilityState === 'visible') {
@@ -251,17 +385,11 @@ const requestWakeLock = async () => {
     }
 });
 
-        // --- BLUETOOTH LOGIC ---
         document.getElementById('connectBtn').onclick = async () => {
             try {
-
-                // --- TAMBAHKAN INI ---
-        requestWakeLock(); 
-        // ---------------------
-
+                if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
                 const device = await navigator.bluetooth.requestDevice({ 
-                    acceptAllDevices: true, 
-                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] 
+                    acceptAllDevices: true, optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] 
                 });
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
@@ -287,125 +415,24 @@ const requestWakeLock = async () => {
             } catch(e) { alert("BT: " + e); }
         };
 
-        function parse(pkt, head) {
-            const data = pkt.slice(1, -1);
-            const dv = new DataView(data.buffer);
-            const f = [];
-            if(head !== 0xEE) for(let i=0; i<data.length; i+=4) f.push(dv.getFloat32(i, true));
-
-            if (head === 0xAA) {
-                update('vTotal', f[0].toFixed(2)+'V');
-                update('v1', f[1].toFixed(2)); update('v2', f[2].toFixed(2));
-                update('v3', f[3].toFixed(2)); update('v4', f[4].toFixed(2));
-                update('current', f[5].toFixed(2));
-                update('power', f[6].toFixed(0));
-                update('ahDesign', f[7].toFixed(1));
-                update('soc', f[8].toFixed(0));
-                update('whNow', f[9].toFixed(0));
-                update('whDesign', f[10].toFixed(0));
-                Object.assign(window.bmsState, { v:f[0], a:f[5], w:f[6], soc:f[8] });
-            } 
-            else if (head === 0xCC) {
-                update('tMos', f[0].toFixed(1)); update('tBatt', f[1].toFixed(1));
-                update('ahNow', f[2].toFixed(1)); update('capChg', f[3].toFixed(2)); update('capDis', f[4].toFixed(2));
-                relay('rChg', f[5]); relay('rDis', f[6]);
-                update('soh', f[7].toFixed(0)+'%'); update('whPos', f[8].toFixed(0));
-                update('whNeg', f[9].toFixed(0)); update('cycles', f[10].toFixed(0));
-                update('usagePer', f[11].toFixed(0)+'%');
-
-                window.bmsState.t = f[1];
-
-                // Live Graph Update
-                if(liveMode) {
-                    if(unifiedChart.data.labels.length > 50) { 
-                        unifiedChart.data.labels.shift(); 
-                        unifiedChart.data.datasets.forEach(d => d.data.shift()); 
-                    }
-                    unifiedChart.data.labels.push("");
-                    unifiedChart.data.datasets[0].data.push(window.bmsState.w);
-                    unifiedChart.data.datasets[1].data.push(window.bmsState.v);
-                    unifiedChart.data.datasets[2].data.push(window.bmsState.a);
-                    unifiedChart.data.datasets[3].data.push(f[1]);
-                    unifiedChart.update('none');
-                }
-
-                // --- DUAL CLOUD SYNC ---
-                const ts = Date.now();
-                // 1. Realtime DB Sync (For Live Remote View)
-                if(rtdb) set(rRef(rtdb, 'bms_live'), { ...window.bmsState, ts });
-                // 2. Firestore Sync (For Long-term History)
-                if(firestore) addDoc(collection(firestore, "bms_history"), { ...window.bmsState, ts });
-            }
-            else if (head === 0xEE) {
-                const cur = pkt[1];
-                const hist = Array.from(pkt.slice(2, 7));
-                update('errText', cur === 0 ? "System Secure" : "Warning Alert");
-                const card = document.getElementById('errorCard');
-                card.className = cur > 0 ? "glass-card col-span-1 md:col-span-4 border-l-4 border-l-red-500 flex flex-col md:flex-row md:items-center justify-between gap-4" : "glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 flex flex-col md:flex-row md:items-center justify-between gap-4";
-                document.getElementById('errHistory').innerHTML = hist.map(h => `<div class="h-8 w-10 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-[10px] value-mono ${h>0?'text-red-400 border-red-500/30':'text-slate-600'}">${h || '-'}</div>`).join('');
-            }
-            document.getElementById('lastSync').innerText = "Sync: " + new Date().toLocaleTimeString();
-        }
-
-        // --- FIRESTORE HISTORY FETCH ---
-        window.handleDurationChange = async () => {
-            const mode = document.getElementById('chartDuration').value;
-            if (mode === 'live') { liveMode = true; return; }
-            liveMode = false;
-
-            if (!firestore) return alert("Firestore is not configured!");
-            
-            const now = Date.now();
-            let start;
-            if (mode === '12h') start = now - (12*3600000);
-            else if (mode === '24h') start = now - (24*3600000);
-            else if (mode === '7d') start = now - (7*86400000);
-            else if (mode === '30d') start = now - (30*86400000);
-
-            const q = query(collection(firestore, "bms_history"), where("ts", ">=", start), orderBy("ts", "asc"));
-            const snap = await getDocs(q);
-            
-            unifiedChart.data.labels = [];
-            unifiedChart.data.datasets.forEach(d => d.data = []);
-
-            snap.forEach((doc) => {
-                const d = doc.data();
-                const time = new Date(d.ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                unifiedChart.data.labels.push(time);
-                unifiedChart.data.datasets[0].data.push(d.w);
-                unifiedChart.data.datasets[1].data.push(d.v);
-                unifiedChart.data.datasets[2].data.push(d.a);
-                unifiedChart.data.datasets[3].data.push(d.t);
-            });
-            unifiedChart.update();
-        };
-
-        // --- UTILS ---
-        function update(id, v) { const e = document.getElementById(id); if(e) e.innerText = v; }
-        function relay(id, v) { 
-            const e = document.getElementById(id); 
-            if(v > 0.5) { e.className = "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase"; }
-            else { e.className = "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase"; }
-        }
-        window.openCfg = () => document.getElementById('configModal').style.display = 'flex';
-        window.closeCfg = () => document.getElementById('configModal').style.display = 'none';
-        window.saveCfg = () => { localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); location.reload(); };
-        window.exportCfg = () => {
-            const blob = new Blob([localStorage.getItem('bms_v48_cloud')], {type:'application/json'});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'bms_config_v48.json'; a.click();
-        };
-        window.importCfg = () => document.getElementById('importFile').click();
-        document.getElementById('importFile').onchange = (e) => {
-            const reader = new FileReader();
-            reader.onload = (re) => { localStorage.setItem('bms_v48_cloud', re.target.result); location.reload(); };
-            reader.readAsText(e.target.files[0]);
-        };
         function startPolling() { 
             setInterval(() => send('VA'), 2000); 
             setTimeout(() => setInterval(() => send('PT'), 2000), 500);
             setTimeout(() => setInterval(() => send('ER'), 5000), 1000);
         }
         async function send(c) { if(!txChar) return; await txChar.writeValue(new Uint8Array([0xBB, c.charCodeAt(0), c.charCodeAt(1), 0xBB ^ c.charCodeAt(0) ^ c.charCodeAt(1)])); }
+
+        window.addEventListener('online', () => { isOnline = true; syncOfflineData(); });
+        window.addEventListener('offline', () => isOnline = false);
+        function update(id, v) { const e = document.getElementById(id); if(e) e.innerText = v; }
+        function relay(id, v) { 
+            const e = document.getElementById(id); 
+            if(v > 0.5) e.className = "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase";
+            else e.className = "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase";
+        }
+        window.openCfg = () => document.getElementById('configModal').style.display = 'flex';
+        window.closeCfg = () => document.getElementById('configModal').style.display = 'none';
+        window.saveCfg = () => { localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); location.reload(); };
     </script>
 </body>
 </html>
