@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORE BMS PRO - Unified 29-Param Telemetry</title>
+    <title>CORE BMS PRO - High Stability Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
@@ -21,9 +20,7 @@
         .value-mono { font-family: 'JetBrains Mono', monospace; }
         .status-on { color: #10b981; text-shadow: 0 0 10px rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.3) !important; background: rgba(16, 185, 129, 0.05) !important; }
         .status-off { color: #475569; }
-        canvas { min-height: 350px; width: 100% !important; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(20px); }
-        select { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); color: white; font-size: 10px; padding: 5px 10px; border-radius: 8px; outline: none; cursor: pointer; }
     </style>
 </head>
 <body class="p-4 md:p-6">
@@ -32,11 +29,11 @@
         <header class="mb-6 flex justify-between items-end px-2">
             <div>
                 <h1 class="text-3xl font-black tracking-tighter text-white uppercase">Core<span class="text-blue-500">.</span>BMS</h1>
-                <p class="label-caps opacity-50">Unified Telemetry System v5.5 (Full 29-Param Sync)</p>
+                <p class="label-caps opacity-50 text-blue-400">Headless Sync Mode (Max Stability)</p>
             </div>
             <div class="flex gap-2">
-                <button onclick="openCfg()" class="glass-card !p-3 rounded-xl hover:bg-white/10 transition-all">⚙️</button>
-                <button id="connectBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-black text-xs transition-all shadow-lg shadow-blue-900/20 uppercase">Connect</button>
+                <button onclick="openCfg()" class="glass-card !p-3 rounded-xl hover:bg-white/10">⚙️</button>
+                <button id="connectBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all shadow-lg shadow-blue-900/40">Connect</button>
             </div>
         </header>
 
@@ -53,10 +50,10 @@
             <div class="glass-card col-span-1 md:col-span-2">
                 <div class="flex justify-between items-center mb-4"><span class="label-caps">Cell Voltages</span><span id="vTotal" class="text-xl font-black value-mono text-white">0.00V</span></div>
                 <div class="grid grid-cols-4 gap-2">
-                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p class="label-caps !text-[7px] mb-1">C1</p><p id="v1" class="value-mono text-sm font-bold">0.00</p></div>
-                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p class="label-caps !text-[7px] mb-1">C2</p><p id="v2" class="value-mono text-sm font-bold">0.00</p></div>
-                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p class="label-caps !text-[7px] mb-1">C3</p><p id="v3" class="value-mono text-sm font-bold">0.00</p></div>
-                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p class="label-caps !text-[7px] mb-1">C4</p><p id="v4" class="value-mono text-sm font-bold">0.00</p></div>
+                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p id="v1" class="value-mono text-sm font-bold">0.00</p></div>
+                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p id="v2" class="value-mono text-sm font-bold">0.00</p></div>
+                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p id="v3" class="value-mono text-sm font-bold">0.00</p></div>
+                    <div class="bg-white/5 p-3 rounded-2xl text-center"><p id="v4" class="value-mono text-sm font-bold">0.00</p></div>
                 </div>
             </div>
 
@@ -86,27 +83,15 @@
                 </div>
             </div>
 
-            <div class="glass-card col-span-1 md:col-span-4 mt-2">
-                <div class="flex justify-between items-center mb-4 px-2">
-                    <div class="flex items-center gap-4">
-                        <span class="label-caps">Analytics Multi-Stream</span>
-                        <select id="chartDuration" onchange="window.handleDurationChange()">
-                            <option value="live">Live (Realtime)</option>
-                            <option value="12h">Last 12 Hours</option>
-                            <option value="24h">Last 24 Hours</option>
-                            <option value="7d">Last 7 Days</option>
-                        </select>
-                    </div>
-                    <div class="flex flex-wrap gap-3 text-[7px] font-bold">
-                        <span class="text-blue-500">● POWER</span> 
-                        <span class="text-emerald-500">● VOLT</span> 
-                        <span class="text-orange-400">● AMPERE</span> 
-                        <span class="text-red-500">● T-MOS</span> 
-                        <span class="text-yellow-500">● T-BATT</span>
-                        <span id="syncBadge" class="text-emerald-500 ml-2">● RTDB READY</span>
-                    </div>
+            <div class="glass-card col-span-1 md:col-span-4 flex items-center justify-between px-6 py-4">
+                <div class="flex gap-8">
+                    <div><p class="label-caps">Sync Queue</p><p id="syncBadge" class="text-emerald-500 font-bold value-mono italic">READY</p></div>
+                    <div><p class="label-caps">Connection</p><p id="cloudStatus" class="text-slate-500 font-bold value-mono italic uppercase text-[10px]">Cloud Offline</p></div>
                 </div>
-                <div class="h-[350px]"><canvas id="unifiedChart"></canvas></div>
+                <div class="text-right">
+                    <p class="label-caps">Last Update</p>
+                    <p id="lastSync" class="value-mono font-bold text-white tracking-widest text-xs">-</p>
+                </div>
             </div>
 
             <div class="glass-card col-span-1 md:col-span-2">
@@ -134,260 +119,157 @@
 
             <div id="errorCard" class="glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div id="statusDot" class="h-4 w-4 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></div>
-                    <div><span class="label-caps">Security Status</span><h3 id="errText" class="text-xl font-black text-emerald-500 italic uppercase tracking-tighter">System Secure</h3></div>
+                    <div id="statusDot" class="h-4 w-4 rounded-full bg-emerald-500"></div>
+                    <div><span class="label-caps">Security Status</span><h3 id="errText" class="text-xl font-black text-emerald-500 uppercase italic">System Secure</h3></div>
                 </div>
-                <div class="flex flex-col">
-                    <span class="label-caps !text-[7px] mb-2">Security Event Log (Last 5)</span>
-                    <div id="errHistory" class="flex gap-2">
-                        <div id="e1" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
-                        <div id="e2" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
-                        <div id="e3" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
-                        <div id="e4" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
-                        <div id="e5" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono text-slate-400 border border-white/5">-</div>
-                    </div>
+                <div id="errHistory" class="flex gap-2">
+                    <div id="e1" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
+                    <div id="e2" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
+                    <div id="e3" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
+                    <div id="e4" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
+                    <div id="e5" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
                 </div>
             </div>
         </div>
 
-        <footer class="mt-8 flex flex-col md:flex-row justify-between items-center opacity-30 text-[8px] font-bold uppercase tracking-[0.3em] gap-4">
-            <div id="lastSync">Sync: Waiting for Device...</div>
-            <div id="cloudStatus">Cloud: Offline</div>
-            <div>BMS.CORE V5.5 - FULL PARAMETER PROTOCOL</div>
+        <footer class="mt-8 text-center opacity-30 text-[8px] font-bold uppercase tracking-[0.3em]">
+            BMS.CORE V5.5 HEADLESS SYNC - STABLE OPERATION
         </footer>
     </div>
 
     <div id="configModal" class="modal">
         <div class="glass-card w-full max-w-xl mx-4 p-8 border-white/10">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black italic text-white uppercase">RTDB<span class="text-blue-500">Config</span></h2>
-                <button onclick="closeCfg()" class="text-slate-500 hover:text-white">✕</button>
-            </div>
-            <p class="label-caps mb-2 text-blue-400">Firebase Config JSON</p>
-            <textarea id="fbInput" class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] value-mono text-emerald-400 outline-none mb-6" placeholder='{ "apiKey": "...", "databaseURL": "..." }'></textarea>
+            <h2 class="text-2xl font-black text-white mb-4 uppercase tracking-tighter">Firebase Config</h2>
+            <textarea id="fbInput" class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] text-emerald-400 value-mono mb-4 outline-none" placeholder='{ "apiKey": "..." }'></textarea>
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="saveCfg()" class="bg-blue-600 py-4 rounded-xl font-black text-xs hover:bg-blue-500 uppercase">Save Config</button>
-                <button onclick="closeCfg()" class="bg-white/5 py-4 rounded-xl font-black text-[9px] hover:bg-white/10 uppercase">Cancel</button>
+                <button onclick="saveCfg()" class="bg-blue-600 py-4 rounded-xl font-black text-xs uppercase">Save & Reload</button>
+                <button onclick="closeCfg()" class="bg-white/5 py-4 rounded-xl font-black text-[9px] uppercase">Cancel</button>
             </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getDatabase, ref, set, push, query, orderByChild, startAt, get } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
+        import { getDatabase, ref, set, push } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
-
-
-
-
-
-
-        // --- OFFLINE DB ---
-        const db = new Dexie("BMS_Offline_v2");
+        // --- 1. STORAGE SETUP (Dexie) ---
+        const db = new Dexie("BMS_Headless_DB");
         db.version(1).stores({ logs: '++id, ts, synced' });
 
-        // --- GLOBALS ---
         let rtdb = null;
-        let rxChar, txChar, buffer = new Uint8Array(0);
-        let wakeLock = null;
+        let rxChar, txChar;
+        let buffer = new Uint8Array(0);
         let isOnline = navigator.onLine;
-        let liveMode = true;
-        
+        let isSyncing = false;
 
-        async function requestWakeLock() {
-    try {
-        // Hanya jalankan jika browser mendukung
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-            console.log('Wake Lock is active');
-            
-            // Event listener jika wake lock terlepas (misal: karena pindah tab)
-            wakeLock.addEventListener('release', () => {
-                console.log('Wake Lock was released');
-            });
-        }
-    } catch (err) {
-        console.error(`${err.name}, ${err.message}`);
-    }
-}
-
-
-
-        // Objek 29 Parameter (VA:11, PT:12, ER:6)
         window.bmsState = { 
-            v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, // VA
-            tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0, // PT
-            err:0, e1:0, e2:0, e3:0, e4:0, e5:0 // ER
+            v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, 
+            tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
+            err:0, e1:0, e2:0, e3:0, e4:0, e5:0 
         };
 
-        // --- CHART SETUP ---
-        const ctx = document.getElementById('unifiedChart').getContext('2d');
-        const unifiedChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: Array(50).fill(''),
-                datasets: [
-                    { label: 'Power', data: [], borderColor: '#3b82f6', borderWidth: 2, tension: 0.4, pointRadius: 0, yAxisID: 'y' },
-                    { label: 'Volt', data: [], borderColor: '#10b981', borderWidth: 2, tension: 0.4, pointRadius: 0, yAxisID: 'y' },
-                    { label: 'Ampere', data: [], borderColor: '#fb923c', borderWidth: 2, tension: 0.4, pointRadius: 0, yAxisID: 'y1' },
-                    { label: 'T-Mos', data: [], borderColor: '#ef4444', borderWidth: 1.5, borderDash: [5,5], tension: 0.4, pointRadius: 0, yAxisID: 'y1' },
-                    { label: 'T-Batt', data: [], borderColor: '#eab308', borderWidth: 1.5, borderDash: [5,5], tension: 0.4, pointRadius: 0, yAxisID: 'y1' }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { 
-                    x: { display: false }, 
-                    y: { position: 'left', grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#475569', font: { size: 9 } } },
-                    y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#64748b', font: { size: 8 } } }
-                }
-            }
-        });
-
-        // --- FIREBASE INITIALIZE ---
+        // --- 2. FIREBASE INIT ---
         const saved = localStorage.getItem('bms_v48_cloud');
         if(saved) {
             try { 
                 const config = JSON.parse(saved);
                 const app = initializeApp(config);
                 rtdb = getDatabase(app);
-                document.getElementById('fbInput').value = saved;
-                document.getElementById('cloudStatus').innerText = "Cloud: RTDB Active";
-                document.getElementById('cloudStatus').className = "text-emerald-500 font-bold";
-            } catch(e) { console.error("Firebase Init Error:", e); }
+                uEl('cloudStatus', "RTDB ACTIVE");
+                document.getElementById('cloudStatus').className = "text-emerald-500 font-bold value-mono italic uppercase text-[10px]";
+            } catch(e) { console.error("FB Init Error:", e); }
         }
 
-        // --- TELEMETRY & SYNC ---
-        async function processTelemetry(data) {
-            const ts = Date.now();
-            const entry = { ...data, ts };
+        // --- UBAH FUNGSI INI ---
+async function processTelemetry(data) {
+    const ts = Date.now();
+    
+    // 1. DATA UNTUK LIVE (Kirim SEMUA 29 Parameter)
+    // Langsung dikirim ke Firebase 'bms_live'
+    if(isOnline && rtdb) {
+        set(ref(rtdb, 'bms_live'), { ...data, ts });
+    }
 
-            if(liveMode) {
-                if(unifiedChart.data.datasets[0].data.length > 50) {
-                    unifiedChart.data.datasets.forEach(d => d.data.shift());
-                    unifiedChart.data.labels.shift();
+    // 2. DATA UNTUK HISTORY (Hanya kirim a, v, p, tM, tB)
+    // Objek ini yang akan masuk ke antrean dan folder 'bms_history'
+    const historyEntry = {
+        ts: ts,
+        a: data.a,
+        v: data.v,
+        p: data.p,
+        tM: data.tM,
+        tB: data.tB
+    };
+
+    // Masukkan data ringkas ke Antrean lokal (IndexedDB)
+    await db.logs.add({ ...historyEntry, synced: 0 });
+
+    // 3. Jalankan pengosongan antrean di background
+    if(!isSyncing) syncBackground();
+    updateSyncStatus();
+}
+
+        async function syncBackground() {
+            if(!isOnline || !rtdb || isSyncing) return;
+            isSyncing = true;
+            try {
+                // Batch per 30 data agar tidak membekukan CPU
+                const pending = await db.logs.where('synced').equals(0).limit(30).toArray();
+                if(pending.length > 0) {
+                    for(const item of pending) {
+                        const { id, synced, ...payload } = item;
+                        await push(ref(rtdb, 'bms_history'), payload);
+                        await db.logs.delete(id); // Langsung hapus setelah sukses
+                    }
                 }
-                unifiedChart.data.labels.push("");
-                unifiedChart.data.datasets[0].data.push(data.p);
-                unifiedChart.data.datasets[1].data.push(data.v);
-                unifiedChart.data.datasets[2].data.push(data.a);
-                unifiedChart.data.datasets[3].data.push(data.tM);
-                unifiedChart.data.datasets[4].data.push(data.tB);
-                unifiedChart.update('none');
-            }
-
-            await db.logs.add({ ...entry, synced: 0 });
-
-            if(isOnline && rtdb) {
-                set(ref(rtdb, 'bms_live'), entry);
-                syncOfflineData();
-            }
-            updateSyncBadge();
+            } catch(e) { console.warn("Sync connection interrupted"); }
+            isSyncing = false;
         }
 
-        async function syncOfflineData() {
-            if(!isOnline || !rtdb) return;
-            const pending = await db.logs.where('synced').equals(0).limit(20).toArray();
-            for(const item of pending) {
-                try {
-                    const { id, synced, ...fullData } = item;
-                    await push(ref(rtdb, 'bms_history'), fullData);
-                    await db.logs.update(item.id, { synced: 1 });
-                } catch(e) { break; }
-            }
-            await db.logs.where('synced').equals(1).delete();
-        }
-
-        async function updateSyncBadge() {
-            const count = await db.logs.where('synced').equals(0).count();
-            const badge = document.getElementById('syncBadge');
-            if(count > 0) {
-                badge.innerText = `● QUEUE: ${count}`;
-                badge.className = "text-orange-500 animate-pulse";
-            } else {
-                badge.innerText = `● RTDB READY`;
-                badge.className = "text-emerald-500";
-            }
-        }
-
-        // --- BLUETOOTH & PARSING ---
+        // --- 4. DATA PARSER ---
         function parse(pkt, head) {
             const data = pkt.slice(1, -1);
             const dv = new DataView(data.buffer);
             const f = [];
-            if(head !== 0xEE) for(let i=0; i<data.length; i+=4) f.push(dv.getFloat32(i, true));
+            if(head !== 0xEE) {
+                for(let i=0; i<data.length; i+=4) if(i+4 <= data.length) f.push(dv.getFloat32(i, true));
+            }
 
-            if (head === 0xAA) { // VA Data (11)
-                update('vTotal', f[0].toFixed(2)+'V');
-                update('v1', f[1].toFixed(2)); update('v2', f[2].toFixed(2));
-                update('v3', f[3].toFixed(2)); update('v4', f[4].toFixed(2));
-                update('current', f[5].toFixed(2));
-                update('power', f[6].toFixed(0));
-                update('ahDesign', f[7].toFixed(1));
-                update('soc', f[8].toFixed(0));
-                update('whNow', f[9].toFixed(0));
-                update('whDesign', f[10].toFixed(0));
+            if (head === 0xAA) { // VA Data
+                uEl('vTotal', f[0].toFixed(2)+'V');
+                uEl('v1', f[1].toFixed(2)); uEl('v2', f[2].toFixed(2));
+                uEl('v3', f[3].toFixed(2)); uEl('v4', f[4].toFixed(2));
+                uEl('current', f[5].toFixed(2)); uEl('power', f[6].toFixed(0));
+                uEl('ahDesign', f[7].toFixed(1)); uEl('soc', f[8].toFixed(0));
+                uEl('whNow', f[9].toFixed(0)); uEl('whDesign', f[10].toFixed(0));
                 Object.assign(window.bmsState, { v:f[0], v1:f[1], v2:f[2], v3:f[3], v4:f[4], a:f[5], p:f[6], ahD:f[7], soc:f[8], whN:f[9], whD:f[10] });
             } 
-            else if (head === 0xCC) { // PT Data (12)
-                update('tMos', f[0].toFixed(1)+'°C'); update('tBatt', f[1].toFixed(1)+'°C');
-                update('ahNow', f[2].toFixed(1)); update('capChg', f[3].toFixed(2)+' Ah'); update('capDis', f[4].toFixed(2)+' Ah');
+            else if (head === 0xCC) { // PT Data
+                uEl('tMos', f[0].toFixed(1)+'°C'); uEl('tBatt', f[1].toFixed(1)+'°C');
+                uEl('ahNow', f[2].toFixed(1)); uEl('capChg', f[3].toFixed(2)+' Ah'); uEl('capDis', f[4].toFixed(2)+' Ah');
                 relay('rChg', f[5]); relay('rDis', f[6]);
-                update('soh', f[7].toFixed(0)+'%'); update('whPos', f[8].toFixed(0));
-                update('whNeg', f[9].toFixed(0)); update('cycles', f[10].toFixed(0));
-                update('usagePer', f[11].toFixed(0)+'%');
+                uEl('soh', f[7].toFixed(0)+'%'); uEl('whPos', f[8].toFixed(0));
+                uEl('whNeg', f[9].toFixed(0)); uEl('cycles', f[10].toFixed(0));
+                uEl('usagePer', f[11].toFixed(0)+'%');
                 Object.assign(window.bmsState, { tM:f[0], tB:f[1], ahN:f[2], cChg:f[3], cDis:f[4], rC:f[5], rD:f[6], soh:f[7], wP:f[8], wN:f[9], cyc:f[10], uP:f[11] });
                 
-                // Trigger Sync setelah paket data utama lengkap
+                // Trigger Kirim Data setelah PT diterima (lengkap)
                 processTelemetry(window.bmsState);
             }
-            else if (head === 0xEE) { // ER Data (6)
+            else if (head === 0xEE) { // Error Data
                 const err = pkt[1];
-                update('errText', err === 0 ? "System Secure" : "Warning Alert");
-                update('e1', pkt[2]); update('e2', pkt[3]); update('e3', pkt[4]); update('e4', pkt[5]); update('e5', pkt[6]);
+                uEl('errText', err === 0 ? "System Secure" : "Warning Alert");
+                uEl('e1', pkt[2]); uEl('e2', pkt[3]); uEl('e3', pkt[4]); uEl('e4', pkt[5]); uEl('e5', pkt[6]);
                 const card = document.getElementById('errorCard');
-                card.className = err > 0 ? "glass-card col-span-1 md:col-span-4 border-l-4 border-l-red-500 ..." : "glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 ...";
+                card.style.borderLeftColor = err > 0 ? '#ef4444' : '#10b981';
                 Object.assign(window.bmsState, { err:pkt[1], e1:pkt[2], e2:pkt[3], e3:pkt[4], e4:pkt[5], e5:pkt[6] });
             }
-            document.getElementById('lastSync').innerText = "Sync: " + new Date().toLocaleTimeString();
+            uEl('lastSync', new Date().toLocaleTimeString());
         }
 
-        // --- UTILS & HANDLERS ---
-        window.handleDurationChange = async () => {
-            const mode = document.getElementById('chartDuration').value;
-            if (mode === 'live') { liveMode = true; return; }
-            liveMode = false;
-            if (!rtdb) return alert("Firebase not configured!");
-            
-            const now = Date.now();
-            let start = now - (12*3600000);
-            if(mode === '24h') start = now - 86400000;
-            if(mode === '7d') start = now - 604800000;
-
-            const snap = await get(query(ref(rtdb, 'bms_history'), orderByChild('ts'), startAt(start)));
-            unifiedChart.data.labels = []; unifiedChart.data.datasets.forEach(d => d.data = []);
-            if(snap.exists()) {
-                snap.forEach(c => {
-                    const d = c.val();
-                    unifiedChart.data.labels.push(new Date(d.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
-                    unifiedChart.data.datasets[0].data.push(d.p); unifiedChart.data.datasets[1].data.push(d.v);
-                    unifiedChart.data.datasets[2].data.push(d.a); unifiedChart.data.datasets[3].data.push(d.tM);
-                    unifiedChart.data.datasets[4].data.push(d.tB);
-                });
-            }
-            unifiedChart.update();
-        };
-
-        document.addEventListener('visibilitychange', async () => {
-    if (wakeLock !== null && document.visibilityState === 'visible') {
-        await requestWakeLock();
-    }
-});
-
+        // --- 5. BLUETOOTH HANDLER ---
         document.getElementById('connectBtn').onclick = async () => {
             try {
-                if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
                 const device = await navigator.bluetooth.requestDevice({ 
                     acceptAllDevices: true, optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] 
                 });
@@ -401,18 +283,24 @@
                     const chunk = new Uint8Array(e.target.value.buffer);
                     let temp = new Uint8Array(buffer.length + chunk.length);
                     temp.set(buffer); temp.set(chunk, buffer.length); buffer = temp;
+                    
+                    if(buffer.length > 1024) buffer = new Uint8Array(0); // Anti-crash buffer
+
                     while (buffer.length > 0) {
                         const h = buffer[0];
                         let len = (h === 0xAA) ? 46 : (h === 0xCC) ? 50 : (h === 0xEE) ? 8 : 0;
-                        if (len === 0 || buffer.length < len) break;
+                        if (len === 0) { buffer = buffer.slice(1); continue; }
+                        if (buffer.length < len) break;
                         parse(buffer.slice(0, len), h);
                         buffer = buffer.slice(len);
                     }
                 });
-                document.getElementById('connectBtn').innerText = "Connected";
-                document.getElementById('connectBtn').className = "bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase";
+                document.getElementById('connectBtn').innerText = "ONLINE";
+                document.getElementById('connectBtn').className = "bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs";
                 startPolling();
-            } catch(e) { alert("BT: " + e); }
+                // Cegah layar mati saat proses berjalan (opsional)
+                if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+            } catch(e) { alert("BT Connect Error: " + e); }
         };
 
         function startPolling() { 
@@ -420,19 +308,35 @@
             setTimeout(() => setInterval(() => send('PT'), 2000), 500);
             setTimeout(() => setInterval(() => send('ER'), 5000), 1000);
         }
-        async function send(c) { if(!txChar) return; await txChar.writeValue(new Uint8Array([0xBB, c.charCodeAt(0), c.charCodeAt(1), 0xBB ^ c.charCodeAt(0) ^ c.charCodeAt(1)])); }
-
-        window.addEventListener('online', () => { isOnline = true; syncOfflineData(); });
-        window.addEventListener('offline', () => isOnline = false);
-        function update(id, v) { const e = document.getElementById(id); if(e) e.innerText = v; }
-        function relay(id, v) { 
-            const e = document.getElementById(id); 
-            if(v > 0.5) e.className = "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase";
-            else e.className = "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase";
+        async function send(c) { 
+            if(!txChar) return; 
+            const cmd = new Uint8Array([0xBB, c.charCodeAt(0), c.charCodeAt(1), 0xBB ^ c.charCodeAt(0) ^ c.charCodeAt(1)]);
+            await txChar.writeValue(cmd); 
         }
+
+        // --- 6. UTILITIES ---
+        function uEl(id, v) { const e = document.getElementById(id); if(e) e.innerText = v; }
+        function relay(id, v) { 
+            const e = document.getElementById(id); if(!e) return;
+            e.className = v > 0.5 ? "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase" : "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase";
+        }
+        async function updateSyncStatus() {
+            const count = await db.logs.count();
+            const b = document.getElementById('syncBadge');
+            if(count > 0) {
+                b.innerText = `QUEUED: ${count}`;
+                b.className = "text-orange-500 font-bold value-mono italic animate-pulse";
+            } else {
+                b.innerText = "READY";
+                b.className = "text-emerald-500 font-bold value-mono italic";
+            }
+        }
+
         window.openCfg = () => document.getElementById('configModal').style.display = 'flex';
         window.closeCfg = () => document.getElementById('configModal').style.display = 'none';
         window.saveCfg = () => { localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); location.reload(); };
+        window.addEventListener('online', () => { isOnline = true; syncBackground(); });
+        window.addEventListener('offline', () => isOnline = false);
     </script>
 </body>
 </html>
