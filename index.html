@@ -180,51 +180,90 @@
             } catch(e) { console.error("FB Init Error:", e); }
         }
 
+
+async function cleanupOldHistory() {
+    if (!isOnline || !rtdb) return;
+
+    const historyRef = ref(rtdb, 'bms_history');
+    const now = Date.now();
+    const tujuhHariMilidetik = 7 * 24 * 60 * 60 * 1000;
+    const waktuCutoff = now - tujuhHariMilidetik;
+
+    // 1. Hapus data berdasarkan UMUR (lebih dari 7 hari)
+    // Gunakan query untuk mencari data dengan ts < waktuCutoff
+    const oldDataQuery = query(historyRef, orderByChild('ts'), endAt(waktuCutoff));
+    const snapshot = await get(oldDataQuery);
+    
+    if (snapshot.exists()) {
+        const updates = {};
+        snapshot.forEach((child) => {
+            updates[child.key] = null; // Set null untuk menghapus
+        });
+        await update(historyRef, updates);
+        console.log("Data lama (>7 hari) berhasil dihapus");
+    }
+
+    // 2. Batasi JUMLAH (Maksimal 50.400 data)
+    // Logika: Jika jumlah data sangat besar, Firebase akan menghapus data tertua
+    // Namun, cara paling efisien di Firebase adalah menghapus data berdasarkan rentang waktu 
+    // karena 'count' secara langsung cukup berat di RTDB. 
+    // Batasan 7 hari dengan interval 12 detik sudah otomatis menghasilkan ~50.400 data.
+}
+        
         // --- UBAH FUNGSI INI ---
 async function processTelemetry(data) {
     const ts = Date.now();
     
-    // 1. DATA UNTUK LIVE (Kirim SEMUA 29 Parameter)
-    // Langsung dikirim ke Firebase 'bms_live'
+    // 1. LIVE DATA (Tetap real-time tiap ada data masuk)
     if(isOnline && rtdb) {
         set(ref(rtdb, 'bms_live'), { ...data, ts });
     }
 
-    // 2. DATA UNTUK HISTORY (Hanya kirim a, v, p, tM, tB)
-    // Objek ini yang akan masuk ke antrean dan folder 'bms_history'
-    const historyEntry = {
-        ts: ts,
-        a: data.a,
-        v: data.v,
-        p: data.p,
-        tM: data.tM,
-        tB: data.tB
-    };
+    // 2. LOGIKA SAMPLING HISTORY (1 data tiap 12 detik)
+    if (ts - lastSampleTime >= SAMPLE_INTERVAL) {
+        const historyEntry = {
+            ts: ts,
+            a: data.a,
+            v: data.v,
+            p: data.p,
+            tM: data.tM,
+            tB: data.tB,
+            synced: 0 // Penanda untuk proses sync
+        };
 
-    // Masukkan data ringkas ke Antrean lokal (IndexedDB)
-    await db.logs.add({ ...historyEntry, synced: 0 });
+        // Simpan ke antrean lokal (IndexedDB)
+        await db.logs.add(historyEntry);
+        
+        // Update waktu pengambilan sampel terakhir
+        lastSampleTime = ts;
 
-    // 3. Jalankan pengosongan antrean di background
-    if(!isSyncing) syncBackground();
+        // 3. TRIGGER SYNC (Hanya dijalankan tiap kali data history baru masuk)
+        if(!isSyncing) syncBackground();
+    }
+
     updateSyncStatus();
 }
 
-        async function syncBackground() {
-            if(!isOnline || !rtdb || isSyncing) return;
-            isSyncing = true;
-            try {
-                // Batch per 30 data agar tidak membekukan CPU
-                const pending = await db.logs.where('synced').equals(0).limit(30).toArray();
-                if(pending.length > 0) {
-                    for(const item of pending) {
-                        const { id, synced, ...payload } = item;
-                        await push(ref(rtdb, 'bms_history'), payload);
-                        await db.logs.delete(id); // Langsung hapus setelah sukses
-                    }
-                }
-            } catch(e) { console.warn("Sync connection interrupted"); }
-            isSyncing = false;
+    async function syncBackground() {
+    if(!isOnline || !rtdb || isSyncing) return;
+    isSyncing = true;
+    try {
+        const pending = await db.logs.where('synced').equals(0).limit(30).toArray();
+        if(pending.length > 0) {
+            for(const item of pending) {
+                const { id, synced, ...payload } = item;
+                await push(ref(rtdb, 'bms_history'), payload);
+                await db.logs.delete(id);
+            }
+            
+            // SETELAH BERHASIL SYNC, JALANKAN CLEANUP
+            await cleanupOldHistory(); 
         }
+    } catch(e) { 
+        console.warn("Sync connection interrupted"); 
+    }
+    isSyncing = false;
+}
 
         // --- 4. DATA PARSER ---
         function parse(pkt, head) {
@@ -304,9 +343,9 @@ async function processTelemetry(data) {
         };
 
         function startPolling() { 
-            setInterval(() => send('VA'), 2000); 
-            setTimeout(() => setInterval(() => send('PT'), 2000), 500);
-            setTimeout(() => setInterval(() => send('ER'), 5000), 1000);
+            setInterval(() => send('VA'), 1000); 
+            setTimeout(() => setInterval(() => send('PT'), 3000), 500);
+            setTimeout(() => setInterval(() => send('ER'), 5000), 500);
         }
         async function send(c) { 
             if(!txChar) return; 
