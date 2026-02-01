@@ -209,6 +209,9 @@ async function cleanupOldHistory() {
     // karena 'count' secara langsung cukup berat di RTDB. 
     // Batasan 7 hari dengan interval 12 detik sudah otomatis menghasilkan ~50.400 data.
 }
+
+ let lastSampleTime = 0;
+const SAMPLE_INTERVAL = 12000; // 12 detik (dalam milidetik)
         
         // --- UBAH FUNGSI INI ---
 async function processTelemetry(data) {
@@ -282,6 +285,8 @@ async function processTelemetry(data) {
                 uEl('ahDesign', f[7].toFixed(1)); uEl('soc', f[8].toFixed(0));
                 uEl('whNow', f[9].toFixed(0)); uEl('whDesign', f[10].toFixed(0));
                 Object.assign(window.bmsState, { v:f[0], v1:f[1], v2:f[2], v3:f[3], v4:f[4], a:f[5], p:f[6], ahD:f[7], soc:f[8], whN:f[9], whD:f[10] });
+
+                processTelemetry(window.bmsState);
             } 
             else if (head === 0xCC) { // PT Data
                 uEl('tMos', f[0].toFixed(1)+'°C'); uEl('tBatt', f[1].toFixed(1)+'°C');
@@ -293,7 +298,7 @@ async function processTelemetry(data) {
                 Object.assign(window.bmsState, { tM:f[0], tB:f[1], ahN:f[2], cChg:f[3], cDis:f[4], rC:f[5], rD:f[6], soh:f[7], wP:f[8], wN:f[9], cyc:f[10], uP:f[11] });
                 
                 // Trigger Kirim Data setelah PT diterima (lengkap)
-                processTelemetry(window.bmsState);
+              
             }
             else if (head === 0xEE) { // Error Data
                 const err = pkt[1];
