@@ -224,9 +224,12 @@
         // 6. BLUETOOTH CORE
         document.getElementById('connectBtn').onclick = async () => {
             try {
+
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }]
-                });
+    acceptAllDevices: true, // Menampilkan semua perangkat BLE yang terdeteksi
+    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] // Tetap daftarkan UUID BMS agar bisa diakses
+});
+               
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
                 rxChar = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
