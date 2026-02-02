@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORE BMS PRO - High Stability Mode</title>
+    <title>CORE BMS PRO - Ultra Stability</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-    
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
         :root { --bg-color: #05070a; --card-bg: rgba(15, 18, 25, 0.8); }
@@ -32,7 +31,7 @@
         <header class="mb-6 flex justify-between items-end px-2">
             <div>
                 <h1 class="text-3xl font-black tracking-tighter text-white uppercase">Core<span class="text-blue-500">.</span>BMS</h1>
-                <p class="label-caps opacity-50 text-blue-400">Headless Sync Mode (Max Stability)</p>
+                <p class="label-caps opacity-50 text-blue-400">Security Optimized (v5.8)</p>
             </div>
             <div class="flex gap-2">
                 <button onclick="openCfg()" class="glass-card !p-3 rounded-xl hover:bg-white/10">⚙️</button>
@@ -60,13 +59,20 @@
                 </div>
             </div>
 
-            <div class="glass-card col-span-1 md:col-span-2">
-                <span class="label-caps">Energy Management</span>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-center">
-                    <div class="bg-white/5 p-2 rounded-xl"><p class="label-caps !text-[7px] opacity-50">Wh Design</p><p id="whDesign" class="text-xs font-bold value-mono">0</p></div>
-                    <div class="bg-white/5 p-2 rounded-xl border border-blue-500/20"><p class="label-caps !text-[7px] text-blue-400">Wh Now</p><p id="whNow" class="text-xs font-bold value-mono">0</p></div>
-                    <div class="bg-white/5 p-2 rounded-xl"><p class="label-caps !text-[7px] opacity-50">Ah Design</p><p id="ahDesign" class="text-xs font-bold value-mono">0.0</p></div>
-                    <div class="bg-white/5 p-2 rounded-xl border border-blue-500/20"><p class="label-caps !text-[7px] text-blue-400">Ah Now</p><p id="ahNow" class="text-xs font-bold value-mono">0.0</p></div>
+            <div id="errorCard" class="glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 transition-all duration-500 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div id="statusDot" class="h-4 w-4 rounded-full bg-emerald-500"></div>
+                    <div>
+                        <span class="label-caps">Security Status</span>
+                        <h3 id="errText" class="text-xl font-black text-emerald-500 uppercase italic">System Secure</h3>
+                    </div>
+                </div>
+                <div id="errHistory" class="flex gap-2">
+                    <div id="e1" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
+                    <div id="e2" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
+                    <div id="e3" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
+                    <div id="e4" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
+                    <div id="e5" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
                 </div>
             </div>
 
@@ -79,73 +85,26 @@
             </div>
 
             <div class="glass-card">
-                <span class="label-caps text-emerald-400">Switch Status</span>
+                <span class="label-caps text-emerald-400">Relay Control</span>
                 <div class="flex flex-col gap-2 mt-4">
                     <div id="rChg" class="status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase">Charging</div>
                     <div id="rDis" class="status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase">Discharge</div>
                 </div>
             </div>
 
-            <div class="glass-card col-span-1 md:col-span-4 flex items-center justify-between px-6 py-4">
-                <div class="flex gap-8">
-                    <div><p class="label-caps">Sync Queue</p><p id="syncBadge" class="text-emerald-500 font-bold value-mono italic">READY</p></div>
-                    <div><p class="label-caps">Connection</p><p id="cloudStatus" class="text-slate-500 font-bold value-mono italic uppercase text-[10px]">Cloud Offline</p></div>
-                </div>
-                <div class="text-right">
-                    <p class="label-caps">Last Update</p>
-                    <p id="lastSync" class="value-mono font-bold text-white tracking-widest text-xs">-</p>
-                </div>
-            </div>
-
-            <div class="glass-card col-span-1 md:col-span-2">
-                <span class="label-caps">Usage Stats</span>
-                <div class="grid grid-cols-2 gap-4 mt-4">
-                    <div><p class="label-caps !text-[7px] text-emerald-500">Wh Charge (+)</p><p id="whPos" class="text-lg font-bold value-mono">0</p></div>
-                    <div><p class="label-caps !text-[7px] text-red-500">Wh Disch (-)</p><p id="whNeg" class="text-lg font-bold value-mono">0</p></div>
-                </div>
-                <div class="mt-4 flex justify-between items-center border-t border-white/5 pt-4">
-                    <div><p class="label-caps">Cycles</p><p id="cycles" class="text-xl font-bold value-mono">0</p></div>
-                    <div class="text-right"><p class="label-caps">SOH</p><p id="soh" class="text-xl font-bold text-emerald-500 value-mono">0%</p></div>
-                </div>
-            </div>
-
-            <div class="glass-card col-span-1 md:col-span-2">
-                <span class="label-caps">Capacity Lifecycle</span>
-                <div class="grid grid-cols-2 gap-4 mt-4">
-                    <div><p class="label-caps !text-[7px]">Cap Charged</p><p id="capChg" class="text-xl font-bold value-mono text-blue-400">0.0 Ah</p></div>
-                    <div><p class="label-caps !text-[7px]">Cap Discharged</p><p id="capDis" class="text-xl font-bold value-mono text-orange-400">0.0 Ah</p></div>
-                </div>
-                <div class="mt-4 border-t border-white/5 pt-4">
-                    <p class="label-caps">Total Lifetime Usage</p><p id="usagePer" class="text-xl font-bold value-mono">0%</p>
-                </div>
-            </div>
-
-            <div id="errorCard" class="glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div class="flex items-center gap-4">
-                    <div id="statusDot" class="h-4 w-4 rounded-full bg-emerald-500"></div>
-                    <div><span class="label-caps">Security Status</span><h3 id="errText" class="text-xl font-black text-emerald-500 uppercase italic">System Secure</h3></div>
-                </div>
-                <div id="errHistory" class="flex gap-2">
-                    <div id="e1" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
-                    <div id="e2" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
-                    <div id="e3" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
-                    <div id="e4" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
-                    <div id="e5" class="h-8 w-10 bg-white/5 rounded flex items-center justify-center text-[10px] value-mono border border-white/5">-</div>
-                </div>
+            <div class="glass-card col-span-1 md:col-span-2 flex items-center justify-between px-6">
+                <div><p class="label-caps">Sync Queue</p><p id="syncBadge" class="text-emerald-500 font-bold value-mono italic">READY</p></div>
+                <div class="text-right"><p class="label-caps">Last Update</p><p id="lastSync" class="value-mono font-bold text-white text-xs">-</p></div>
             </div>
         </div>
-
-        <footer class="mt-8 text-center opacity-30 text-[8px] font-bold uppercase tracking-[0.3em]">
-            BMS.CORE V5.5 HEADLESS SYNC - STABLE OPERATION
-        </footer>
     </div>
 
     <div id="configModal" class="modal">
         <div class="glass-card w-full max-w-xl mx-4 p-8 border-white/10">
-            <h2 class="text-2xl font-black text-white mb-4 uppercase tracking-tighter">Firebase Config</h2>
-            <textarea id="fbInput" class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] text-emerald-400 value-mono mb-4 outline-none" placeholder='{ "apiKey": "..." }'></textarea>
+            <h2 class="text-2xl font-black text-white mb-4 uppercase">Firebase Config</h2>
+            <textarea id="fbInput" class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] text-emerald-400 value-mono mb-4 outline-none"></textarea>
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="saveCfg()" class="bg-blue-600 py-4 rounded-xl font-black text-xs uppercase">Save & Reload</button>
+                <button onclick="saveCfg()" class="bg-blue-600 py-4 rounded-xl font-black text-xs uppercase text-white">Save & Reload</button>
                 <button onclick="closeCfg()" class="bg-white/5 py-4 rounded-xl font-black text-[9px] uppercase">Cancel</button>
             </div>
         </div>
@@ -155,235 +114,181 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getDatabase, ref, set, push } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
-        // --- 1. STORAGE SETUP (Dexie) ---
+        // 1. DATABASE & STATE
         const db = new Dexie("BMS_Headless_DB");
         db.version(1).stores({ logs: '++id, ts, synced' });
 
         let rtdb = null;
         let rxChar, txChar;
         let buffer = new Uint8Array(0);
-        let isOnline = navigator.onLine;
+        let lastSampleTime = 0;
         let isSyncing = false;
 
         window.bmsState = { 
             v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, 
-            tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
-            err:0, e1:0, e2:0, e3:0, e4:0, e5:0 
+            tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, err:0, e1:0, e2:0, e3:0, e4:0, e5:0 
         };
 
-        // --- 2. FIREBASE INIT ---
+        // 2. FIREBASE INIT
         const saved = localStorage.getItem('bms_v48_cloud');
         if(saved) {
-            try { 
-                const config = JSON.parse(saved);
-                const app = initializeApp(config);
-                rtdb = getDatabase(app);
-                uEl('cloudStatus', "RTDB ACTIVE");
-                document.getElementById('cloudStatus').className = "text-emerald-500 font-bold value-mono italic uppercase text-[10px]";
-            } catch(e) { console.error("FB Init Error:", e); }
+            try { rtdb = getDatabase(initializeApp(JSON.parse(saved))); } catch(e) { console.error("FB Fail"); }
         }
 
+        // 3. VOICE ENGINE
+        function speak(msg) {
+            const utterance = new SpeechSynthesisUtterance(msg);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
 
-async function cleanupOldHistory() {
-    if (!isOnline || !rtdb) return;
-
-    const historyRef = ref(rtdb, 'bms_history');
-    const now = Date.now();
-    const tujuhHariMilidetik = 7 * 24 * 60 * 60 * 1000;
-    const waktuCutoff = now - tujuhHariMilidetik;
-
-    // 1. Hapus data berdasarkan UMUR (lebih dari 7 hari)
-    // Gunakan query untuk mencari data dengan ts < waktuCutoff
-    const oldDataQuery = query(historyRef, orderByChild('ts'), endAt(waktuCutoff));
-    const snapshot = await get(oldDataQuery);
-    
-    if (snapshot.exists()) {
-        const updates = {};
-        snapshot.forEach((child) => {
-            updates[child.key] = null; // Set null untuk menghapus
-        });
-        await update(historyRef, updates);
-        console.log("Data lama (>7 hari) berhasil dihapus");
-    }
-
-    // 2. Batasi JUMLAH (Maksimal 50.400 data)
-    // Logika: Jika jumlah data sangat besar, Firebase akan menghapus data tertua
-    // Namun, cara paling efisien di Firebase adalah menghapus data berdasarkan rentang waktu 
-    // karena 'count' secara langsung cukup berat di RTDB. 
-    // Batasan 7 hari dengan interval 12 detik sudah otomatis menghasilkan ~50.400 data.
-}
-
- let lastSampleTime = 0;
-const SAMPLE_INTERVAL = 12000; // 12 detik (dalam milidetik)
-        
-        // --- UBAH FUNGSI INI ---
-async function processTelemetry(data) {
-    const ts = Date.now();
-    
-    // 1. LIVE DATA (Tetap real-time tiap ada data masuk)
-    if(isOnline && rtdb) {
-        set(ref(rtdb, 'bms_live'), { ...data, ts });
-    }
-
-    // 2. LOGIKA SAMPLING HISTORY (1 data tiap 12 detik)
-    if (ts - lastSampleTime >= SAMPLE_INTERVAL) {
-        const historyEntry = {
-            ts: ts,
-            a: data.a,
-            v: data.v,
-            p: data.p,
-            tM: data.tM,
-            tB: data.tB,
-            synced: 0 // Penanda untuk proses sync
-        };
-
-        // Simpan ke antrean lokal (IndexedDB)
-        await db.logs.add(historyEntry);
-        
-        // Update waktu pengambilan sampel terakhir
-        lastSampleTime = ts;
-
-        // 3. TRIGGER SYNC (Hanya dijalankan tiap kali data history baru masuk)
-        if(!isSyncing) syncBackground();
-    }
-
-    updateSyncStatus();
-}
-
-    async function syncBackground() {
-    if(!isOnline || !rtdb || isSyncing) return;
-    isSyncing = true;
-    try {
-        const pending = await db.logs.where('synced').equals(0).limit(30).toArray();
-        if(pending.length > 0) {
-            for(const item of pending) {
-                const { id, synced, ...payload } = item;
-                await push(ref(rtdb, 'bms_history'), payload);
-                await db.logs.delete(id);
+        // 4. DATA PROCESSING
+        async function processTelemetry(data) {
+            const ts = Date.now();
+            if(navigator.onLine && rtdb) {
+                set(ref(rtdb, 'bms_live'), { ...data, ts });
             }
-            
-            // SETELAH BERHASIL SYNC, JALANKAN CLEANUP
-            await cleanupOldHistory(); 
-        }
-    } catch(e) { 
-        console.warn("Sync connection interrupted"); 
-    }
-    isSyncing = false;
-}
 
-        // --- 4. DATA PARSER ---
+            if (ts - lastSampleTime >= 12000) {
+                lastSampleTime = ts;
+                await db.logs.add({ ts, a:data.a, v:data.v, p:data.p, tM:data.tM, tB:data.tB, synced:0 });
+                updateSyncBadge();
+                if(!isSyncing) syncData();
+            }
+        }
+
+        async function syncData() {
+            if(!navigator.onLine || !rtdb || isSyncing) return;
+            isSyncing = true;
+            try {
+                const logs = await db.logs.where('synced').equals(0).limit(10).toArray();
+                for(let log of logs) {
+                    const {id, synced, ...payload} = log;
+                    await push(ref(rtdb, 'bms_history'), payload);
+                    await db.logs.delete(id);
+                }
+            } catch(e) {}
+            isSyncing = false;
+            updateSyncBadge();
+        }
+
+        // 5. PARSER
         function parse(pkt, head) {
             const data = pkt.slice(1, -1);
-            const dv = new DataView(data.buffer);
+            const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
             const f = [];
+            
             if(head !== 0xEE) {
-                for(let i=0; i<data.length; i+=4) if(i+4 <= data.length) f.push(dv.getFloat32(i, true));
+                for(let i=0; i + 4 <= data.length; i+=4) f.push(dv.getFloat32(i, true));
             }
 
-            if (head === 0xAA) { // VA Data
+            if (head === 0xAA) {
                 uEl('vTotal', f[0].toFixed(2)+'V');
                 uEl('v1', f[1].toFixed(2)); uEl('v2', f[2].toFixed(2));
                 uEl('v3', f[3].toFixed(2)); uEl('v4', f[4].toFixed(2));
                 uEl('current', f[5].toFixed(2)); uEl('power', f[6].toFixed(0));
-                uEl('ahDesign', f[7].toFixed(1)); uEl('soc', f[8].toFixed(0));
-                uEl('whNow', f[9].toFixed(0)); uEl('whDesign', f[10].toFixed(0));
-                Object.assign(window.bmsState, { v:f[0], v1:f[1], v2:f[2], v3:f[3], v4:f[4], a:f[5], p:f[6], ahD:f[7], soc:f[8], whN:f[9], whD:f[10] });
-
+                uEl('soc', f[8].toFixed(0));
+                Object.assign(window.bmsState, { v:f[0], v1:f[1], v2:f[2], v3:f[3], v4:f[4], a:f[5], p:f[6], soc:f[8] });
                 processTelemetry(window.bmsState);
             } 
-            else if (head === 0xCC) { // PT Data
+            else if (head === 0xCC) {
                 uEl('tMos', f[0].toFixed(1)+'°C'); uEl('tBatt', f[1].toFixed(1)+'°C');
-                uEl('ahNow', f[2].toFixed(1)); uEl('capChg', f[3].toFixed(2)+' Ah'); uEl('capDis', f[4].toFixed(2)+' Ah');
                 relay('rChg', f[5]); relay('rDis', f[6]);
-                uEl('soh', f[7].toFixed(0)+'%'); uEl('whPos', f[8].toFixed(0));
-                uEl('whNeg', f[9].toFixed(0)); uEl('cycles', f[10].toFixed(0));
-                uEl('usagePer', f[11].toFixed(0)+'%');
-                Object.assign(window.bmsState, { tM:f[0], tB:f[1], ahN:f[2], cChg:f[3], cDis:f[4], rC:f[5], rD:f[6], soh:f[7], wP:f[8], wN:f[9], cyc:f[10], uP:f[11] });
-                
-                // Trigger Kirim Data setelah PT diterima (lengkap)
-              
+                Object.assign(window.bmsState, { tM:f[0], tB:f[1], rC:f[5], rD:f[6] });
             }
-            else if (head === 0xEE) { // Error Data
-                const err = pkt[1];
-                uEl('errText', err === 0 ? "System Secure" : "Warning Alert");
+            else if (head === 0xEE) {
+                const errCode = pkt[1];
+                const isError = errCode > 0;
+                
+                // Voice alert logic
+                if(isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
+                if(!isError && window.bmsState.err > 0) speak("System Secure.");
+
+                uEl('errText', isError ? "Warning Alert" : "System Secure");
                 uEl('e1', pkt[2]); uEl('e2', pkt[3]); uEl('e3', pkt[4]); uEl('e4', pkt[5]); uEl('e5', pkt[6]);
+                
                 const card = document.getElementById('errorCard');
-                card.style.borderLeftColor = err > 0 ? '#ef4444' : '#10b981';
-                Object.assign(window.bmsState, { err:pkt[1], e1:pkt[2], e2:pkt[3], e3:pkt[4], e4:pkt[5], e5:pkt[6] });
+                const dot = document.getElementById('statusDot');
+                const txt = document.getElementById('errText');
+                
+                card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
+                dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
+                txt.className = isError ? "text-xl font-black text-red-500 uppercase italic" : "text-xl font-black text-emerald-500 uppercase italic";
+                
+                Object.assign(window.bmsState, { err:errCode, e1:pkt[2], e2:pkt[3], e3:pkt[4], e4:pkt[5], e5:pkt[6] });
             }
             uEl('lastSync', new Date().toLocaleTimeString());
         }
 
-        // --- 5. BLUETOOTH HANDLER ---
+        // 6. BLUETOOTH CORE
         document.getElementById('connectBtn').onclick = async () => {
             try {
-                const device = await navigator.bluetooth.requestDevice({ 
-                    acceptAllDevices: true, optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] 
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }]
                 });
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
                 rxChar = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
                 txChar = await service.getCharacteristic('0000ffe2-0000-1000-8000-00805f9b34fb');
                 
-                await rxChar.startNotifications();
                 rxChar.addEventListener('characteristicvaluechanged', (e) => {
                     const chunk = new Uint8Array(e.target.value.buffer);
-                    let temp = new Uint8Array(buffer.length + chunk.length);
-                    temp.set(buffer); temp.set(chunk, buffer.length); buffer = temp;
-                    
-                    if(buffer.length > 1024) buffer = new Uint8Array(0); // Anti-crash buffer
+                    let combined = new Uint8Array(buffer.length + chunk.length);
+                    combined.set(buffer); combined.set(chunk, buffer.length);
+                    buffer = combined;
+                    if(buffer.length > 1024) buffer = buffer.slice(-512);
 
-                    while (buffer.length > 0) {
+                    while(buffer.length > 0) {
                         const h = buffer[0];
                         let len = (h === 0xAA) ? 46 : (h === 0xCC) ? 50 : (h === 0xEE) ? 8 : 0;
-                        if (len === 0) { buffer = buffer.slice(1); continue; }
-                        if (buffer.length < len) break;
+                        if(len === 0) { buffer = buffer.slice(1); continue; }
+                        if(buffer.length < len) break;
                         parse(buffer.slice(0, len), h);
                         buffer = buffer.slice(len);
                     }
                 });
-                document.getElementById('connectBtn').innerText = "ONLINE";
-                document.getElementById('connectBtn').className = "bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs";
-                startPolling();
-                // Cegah layar mati saat proses berjalan (opsional)
+                await rxChar.startNotifications();
+                document.getElementById('connectBtn').innerText = "CONNECTED";
+                startSafePolling();
                 if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
-            } catch(e) { alert("BT Connect Error: " + e); }
+            } catch(e) { alert(e.message); }
         };
 
-        function startPolling() { 
-            setInterval(() => send('VA'), 1000); 
-            setTimeout(() => setInterval(() => send('PT'), 3000), 500);
-            setTimeout(() => setInterval(() => send('ER'), 5000), 500);
-        }
-        async function send(c) { 
-            if(!txChar) return; 
-            const cmd = new Uint8Array([0xBB, c.charCodeAt(0), c.charCodeAt(1), 0xBB ^ c.charCodeAt(0) ^ c.charCodeAt(1)]);
-            await txChar.writeValue(cmd); 
+        async function startSafePolling() {
+            if(!txChar) return;
+            const sendCmd = async (s) => {
+                const c = new Uint8Array([0xBB, s.charCodeAt(0), s.charCodeAt(1), 0xBB ^ s.charCodeAt(0) ^ s.charCodeAt(1)]);
+                try { await txChar.writeValue(c); } catch(e) {}
+            };
+            
+            // Loop polling yang tidak akan menumpuk (stack)
+            const poll = async () => {
+                await sendCmd('VA'); await new Promise(r => setTimeout(r, 1500));
+                await sendCmd('PT'); await new Promise(r => setTimeout(r, 1500));
+                await sendCmd('ER'); await new Promise(r => setTimeout(r, 3000));
+                setTimeout(poll, 100);
+            };
+            poll();
         }
 
-        // --- 6. UTILITIES ---
-        function uEl(id, v) { const e = document.getElementById(id); if(e) e.innerText = v; }
-        function relay(id, v) { 
+        // 7. UTILS
+        function uEl(id, v) { const e = document.getElementById(id); if(e && e.innerText !== String(v)) e.innerText = v; }
+        function relay(id, v) {
             const e = document.getElementById(id); if(!e) return;
-            e.className = v > 0.5 ? "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase" : "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase";
+            const isOn = v > 0.5;
+            e.className = isOn ? "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase" : "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase";
         }
-        async function updateSyncStatus() {
+        async function updateSyncBadge() {
             const count = await db.logs.count();
             const b = document.getElementById('syncBadge');
-            if(count > 0) {
-                b.innerText = `QUEUED: ${count}`;
-                b.className = "text-orange-500 font-bold value-mono italic animate-pulse";
-            } else {
-                b.innerText = "READY";
-                b.className = "text-emerald-500 font-bold value-mono italic";
-            }
+            b.innerText = count > 0 ? `QUEUED: ${count}` : "READY";
+            b.className = count > 0 ? "text-orange-500 font-bold animate-pulse" : "text-emerald-500 font-bold";
         }
 
         window.openCfg = () => document.getElementById('configModal').style.display = 'flex';
         window.closeCfg = () => document.getElementById('configModal').style.display = 'none';
         window.saveCfg = () => { localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); location.reload(); };
-        window.addEventListener('online', () => { isOnline = true; syncBackground(); });
-        window.addEventListener('offline', () => isOnline = false);
     </script>
 </body>
 </html>
