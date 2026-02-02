@@ -173,53 +173,80 @@
             updateSyncBadge();
         }
 
-        // 5. PARSER
-        function parse(pkt, head) {
-            const data = pkt.slice(1, -1);
-            const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-            const f = [];
-            
-            if(head !== 0xEE) {
-                for(let i=0; i + 4 <= data.length; i+=4) f.push(dv.getFloat32(i, true));
-            }
+       // --- 5. PARSER (FIXED: FULL 29 PARAMETERS) ---
+function parse(pkt, head) {
+    const data = pkt.slice(1, -1);
+    const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const f = [];
+    
+    // Ambil semua float yang tersedia di paket data
+    if(head !== 0xEE) {
+        for(let i=0; i + 4 <= data.length; i+=4) f.push(dv.getFloat32(i, true));
+    }
 
-            if (head === 0xAA) {
-                uEl('vTotal', f[0].toFixed(2)+'V');
-                uEl('v1', f[1].toFixed(2)); uEl('v2', f[2].toFixed(2));
-                uEl('v3', f[3].toFixed(2)); uEl('v4', f[4].toFixed(2));
-                uEl('current', f[5].toFixed(2)); uEl('power', f[6].toFixed(0));
-                uEl('soc', f[8].toFixed(0));
-                Object.assign(window.bmsState, { v:f[0], v1:f[1], v2:f[2], v3:f[3], v4:f[4], a:f[5], p:f[6], soc:f[8] });
-                processTelemetry(window.bmsState);
-            } 
-            else if (head === 0xCC) {
-                uEl('tMos', f[0].toFixed(1)+'°C'); uEl('tBatt', f[1].toFixed(1)+'°C');
-                relay('rChg', f[5]); relay('rDis', f[6]);
-                Object.assign(window.bmsState, { tM:f[0], tB:f[1], rC:f[5], rD:f[6] });
-            }
-            else if (head === 0xEE) {
-                const errCode = pkt[1];
-                const isError = errCode > 0;
-                
-                // Voice alert logic
-                if(isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
-                if(!isError && window.bmsState.err > 0) speak("System Secure.");
+    if (head === 0xAA) { // Paket VA (11 Parameter Float)
+        // Update UI
+        uEl('vTotal', f[0].toFixed(2)+'V');
+        uEl('v1', f[1].toFixed(2)); uEl('v2', f[2].toFixed(2));
+        uEl('v3', f[3].toFixed(2)); uEl('v4', f[4].toFixed(2));
+        uEl('current', f[5].toFixed(2)); uEl('power', f[6].toFixed(0));
+        uEl('ahDesign', f[7].toFixed(1)); uEl('soc', f[8].toFixed(0));
+        uEl('whNow', f[9].toFixed(0)); uEl('whDesign', f[10].toFixed(0));
 
-                uEl('errText', isError ? "Warning Alert" : "System Secure");
-                uEl('e1', pkt[2]); uEl('e2', pkt[3]); uEl('e3', pkt[4]); uEl('e4', pkt[5]); uEl('e5', pkt[6]);
-                
-                const card = document.getElementById('errorCard');
-                const dot = document.getElementById('statusDot');
-                const txt = document.getElementById('errText');
-                
-                card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
-                dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
-                txt.className = isError ? "text-xl font-black text-red-500 uppercase italic" : "text-xl font-black text-emerald-500 uppercase italic";
-                
-                Object.assign(window.bmsState, { err:errCode, e1:pkt[2], e2:pkt[3], e3:pkt[4], e4:pkt[5], e5:pkt[6] });
-            }
-            uEl('lastSync', new Date().toLocaleTimeString());
-        }
+        // Simpan SEMUA ke state (LENGKAP)
+        Object.assign(window.bmsState, { 
+            v:f[0], v1:f[1], v2:f[2], v3:f[3], v4:f[4], 
+            a:f[5], p:f[6], ahD:f[7], soc:f[8], whN:f[9], whD:f[10] 
+        });
+        
+        // Langsung proses kirim ke bms_live
+        processTelemetry(window.bmsState);
+    } 
+    else if (head === 0xCC) { // Paket PT (12 Parameter Float)
+        // Update UI
+        uEl('tMos', f[0].toFixed(1)+'°C'); uEl('tBatt', f[1].toFixed(1)+'°C');
+        uEl('ahNow', f[2].toFixed(1)); 
+        uEl('capChg', f[3].toFixed(2)+' Ah'); uEl('capDis', f[4].toFixed(2)+' Ah');
+        uEl('soh', f[7].toFixed(0)+'%');
+        relay('rChg', f[5]); relay('rDis', f[6]);
+
+        // Simpan SEMUA ke state (LENGKAP)
+        Object.assign(window.bmsState, { 
+            tM:f[0], tB:f[1], ahN:f[2], cChg:f[3], cDis:f[4], 
+            rC:f[5], rD:f[6], soh:f[7], wP:f[8], wN:f[9], cyc:f[10], uP:f[11] 
+        });
+
+        processTelemetry(window.bmsState);
+    }
+    else if (head === 0xEE) { // Paket Security (6 Parameter Byte)
+        const errCode = pkt[1];
+        const isError = errCode > 0;
+        
+        // Voice alert logic
+        if(isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
+        if(!isError && window.bmsState.err > 0) speak("System Secure.");
+
+        // Update UI Security
+        uEl('errText', isError ? "Warning Alert" : "System Secure");
+        uEl('e1', pkt[2]); uEl('e2', pkt[3]); uEl('e3', pkt[4]); uEl('e4', pkt[5]); uEl('e5', pkt[6]);
+        
+        const card = document.getElementById('errorCard');
+        const dot = document.getElementById('statusDot');
+        const txt = document.getElementById('errText');
+        
+        card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
+        dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
+        txt.className = isError ? "text-xl font-black text-red-500 uppercase italic" : "text-xl font-black text-emerald-500 uppercase italic";
+        
+        // Simpan SEMUA data error ke state
+        Object.assign(window.bmsState, { 
+            err:errCode, e1:pkt[2], e2:pkt[3], e3:pkt[4], e4:pkt[5], e5:pkt[6] 
+        });
+
+        processTelemetry(window.bmsState);
+    }
+    uEl('lastSync', new Date().toLocaleTimeString());
+}
 
         // 6. BLUETOOTH CORE
         document.getElementById('connectBtn').onclick = async () => {
