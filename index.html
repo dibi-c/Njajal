@@ -150,7 +150,7 @@
                 set(ref(rtdb, 'bms_live'), { ...data, ts });
             }
 
-            if (ts - lastSampleTime >= 12000) {
+            if (ts - lastSampleTime >= 1000) {
                 lastSampleTime = ts;
                 await db.logs.add({ ts, a:data.a, v:data.v, p:data.p, tM:data.tM, tB:data.tB, synced:0 });
                 updateSyncBadge();
@@ -174,7 +174,7 @@
         }
 
        // --- 5. PARSER (FIXED: FULL 29 PARAMETERS) ---
-function parse(pkt, head) {
+   function parse(pkt, head) {
     const data = pkt.slice(1, -1);
     const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const f = [];
@@ -253,9 +253,9 @@ function parse(pkt, head) {
             try {
 
                 const device = await navigator.bluetooth.requestDevice({
-    acceptAllDevices: true, // Menampilkan semua perangkat BLE yang terdeteksi
-    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] // Tetap daftarkan UUID BMS agar bisa diakses
-});
+                      acceptAllDevices: true, // Menampilkan semua perangkat BLE yang terdeteksi
+                      optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] // Tetap daftarkan UUID BMS agar bisa diakses
+                       });
                
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
@@ -294,9 +294,9 @@ function parse(pkt, head) {
             
             // Loop polling yang tidak akan menumpuk (stack)
             const poll = async () => {
-                await sendCmd('VA'); await new Promise(r => setTimeout(r, 1500));
-                await sendCmd('PT'); await new Promise(r => setTimeout(r, 1500));
-                await sendCmd('ER'); await new Promise(r => setTimeout(r, 3000));
+                await sendCmd('VA'); await new Promise(r => setTimeout(r, 500));
+                await sendCmd('PT'); await new Promise(r => setTimeout(r, 500));
+                await sendCmd('ER'); await new Promise(r => setTimeout(r, 1000));
                 setTimeout(poll, 100);
             };
             poll();
