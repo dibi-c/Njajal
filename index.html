@@ -124,9 +124,11 @@
         let lastSampleTime = 0;
         let isSyncing = false;
 
+
         window.bmsState = { 
-            v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, 
-            tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, err:0, e1:0, e2:0, e3:0, e4:0, e5:0 
+           v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, 
+           tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
+           err:0, err_time:"", e1:0, e1_time:"", e2:0, e2_time:"", e3:0, e3_time:"", e4:0, e4_time:"", e5:0, e5_time:"" 
         };
 
         // 2. FIREBASE INIT
@@ -137,11 +139,12 @@
 
         // 3. VOICE ENGINE
         function speak(msg) {
-            const utterance = new SpeechSynthesisUtterance(msg);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
-        }
+        window.speechSynthesis.cancel(); // Hentikan suara sebelumnya sebelum bicara baru
+        const utterance = new SpeechSynthesisUtterance(msg);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+       }
 
         // 4. DATA PROCESSING
         async function processTelemetry(data) {
@@ -150,7 +153,7 @@
                 set(ref(rtdb, 'bms_live'), { ...data, ts });
             }
 
-            if (ts - lastSampleTime >= 1000) {
+            if (ts - lastSampleTime >= 3000) {
                 lastSampleTime = ts;
                 await db.logs.add({ ts, a:data.a, v:data.v, p:data.p, tM:data.tM, tB:data.tB, synced:0 });
                 updateSyncBadge();
@@ -173,79 +176,102 @@
             updateSyncBadge();
         }
 
-       // --- 5. PARSER (FIXED: FULL 29 PARAMETERS) ---
-   function parse(pkt, head) {
+    // --- 5. PARSER (FIXED: FULL 29 PARAMETERS) ---
+function parse(pkt, head) {
     const data = pkt.slice(1, -1);
     const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const f = [];
-    
-    // Ambil semua float yang tersedia di paket data
-    if(head !== 0xEE) {
-        for(let i=0; i + 4 <= data.length; i+=4) f.push(dv.getFloat32(i, true));
+    const now = new Date().toLocaleTimeString('id-ID', { hour12: false });
+
+    // Ambil semua float yang tersedia (Kecuali paket EE yang isinya Byte)
+    if (head !== 0xEE) {
+        for (let i = 0; i + 4 <= data.length; i += 4) f.push(dv.getFloat32(i, true));
     }
 
-    if (head === 0xAA) { // Paket VA (11 Parameter Float)
-        // Update UI
-        uEl('vTotal', f[0].toFixed(2)+'V');
+    if (head === 0xAA) { // Paket VA (Voltage & Ampere)
+        uEl('vTotal', f[0].toFixed(2) + 'V');
         uEl('v1', f[1].toFixed(2)); uEl('v2', f[2].toFixed(2));
         uEl('v3', f[3].toFixed(2)); uEl('v4', f[4].toFixed(2));
         uEl('current', f[5].toFixed(2)); uEl('power', f[6].toFixed(0));
         uEl('ahDesign', f[7].toFixed(1)); uEl('soc', f[8].toFixed(0));
         uEl('whNow', f[9].toFixed(0)); uEl('whDesign', f[10].toFixed(0));
 
-        // Simpan SEMUA ke state (LENGKAP)
-        Object.assign(window.bmsState, { 
-            v:f[0], v1:f[1], v2:f[2], v3:f[3], v4:f[4], 
-            a:f[5], p:f[6], ahD:f[7], soc:f[8], whN:f[9], whD:f[10] 
+        Object.assign(window.bmsState, {
+            v: f[0], v1: f[1], v2: f[2], v3: f[3], v4: f[4],
+            a: f[5], p: f[6], ahD: f[7], soc: f[8], whN: f[9], whD: f[10]
         });
-        
-        // Langsung proses kirim ke bms_live
         processTelemetry(window.bmsState);
     } 
-    else if (head === 0xCC) { // Paket PT (12 Parameter Float)
-        // Update UI
-        uEl('tMos', f[0].toFixed(1)+'°C'); uEl('tBatt', f[1].toFixed(1)+'°C');
-        uEl('ahNow', f[2].toFixed(1)); 
-        uEl('capChg', f[3].toFixed(2)+' Ah'); uEl('capDis', f[4].toFixed(2)+' Ah');
-        uEl('soh', f[7].toFixed(0)+'%');
+    else if (head === 0xCC) { // Paket PT (Power & Temp)
+        uEl('tMos', f[0].toFixed(1) + '°C'); uEl('tBatt', f[1].toFixed(1) + '°C');
+        uEl('ahNow', f[2].toFixed(1));
+        uEl('capChg', f[3].toFixed(2) + ' Ah'); uEl('capDis', f[4].toFixed(2) + ' Ah');
+        uEl('soh', f[7].toFixed(0) + '%');
         relay('rChg', f[5]); relay('rDis', f[6]);
 
-        // Simpan SEMUA ke state (LENGKAP)
-        Object.assign(window.bmsState, { 
-            tM:f[0], tB:f[1], ahN:f[2], cChg:f[3], cDis:f[4], 
-            rC:f[5], rD:f[6], soh:f[7], wP:f[8], wN:f[9], cyc:f[10], uP:f[11] 
+        Object.assign(window.bmsState, {
+            tM: f[0], tB: f[1], ahN: f[2], cChg: f[3], cDis: f[4],
+            rC: f[5], rD: f[6], soh: f[7], wP: f[8], wN: f[9], cyc: f[10], uP: f[11]
         });
-
         processTelemetry(window.bmsState);
-    }
-    else if (head === 0xEE) { // Paket Security (6 Parameter Byte)
+    } 
+    else if (head === 0xEE) { // Paket Security
         const errCode = pkt[1];
         const isError = errCode > 0;
-        
-        // Voice alert logic
-        if(isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
-        if(!isError && window.bmsState.err > 0) speak("System Secure.");
 
-        // Update UI Security
-        uEl('errText', isError ? "Warning Alert" : "System Secure");
-        uEl('e1', pkt[2]); uEl('e2', pkt[3]); uEl('e3', pkt[4]); uEl('e4', pkt[5]); uEl('e5', pkt[6]);
-        
+        // 1. Voice Alert
+        if (isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
+        if (!isError && window.bmsState.err > 0) speak("System Secure.");
+
+        // 2. Logic Shift Register (E1-E5) & Timestamp
+        // Kita loop terbalik agar pendeteksian pergeseran akurat
+        for (let i = 5; i >= 1; i--) {
+            const key = `e${i}`;
+            const newVal = pkt[i + 1]; // pkt[2]=e1, pkt[3]=e2...
+            const prevKey = i > 1 ? `e${i - 1}` : null;
+
+            if (window.bmsState[key] !== newVal) {
+                if (newVal === 0) {
+                    window.bmsState[key] = 0;
+                    window.bmsState[key + '_time'] = "";
+                } else {
+                    // Jika nilai baru sama dengan nilai di slot sebelumnya, copy timestamp-nya (Geser)
+                    if (prevKey && newVal === window.bmsState[prevKey]) {
+                        window.bmsState[key + '_time'] = window.bmsState[prevKey + '_time'];
+                    } else {
+                        // Jika benar-benar kode error baru/unik
+                        window.bmsState[key + '_time'] = now;
+                    }
+                    window.bmsState[key] = newVal;
+                }
+                // Update UI untuk tiap E
+                uEl(key, newVal); 
+            }
+        }
+
+        // 3. Update Main Error State
+        if(window.bmsState.err !== errCode) {
+            window.bmsState.err = errCode;
+            window.bmsState.err_time = isError ? now : "";
+        }
+
+        // 4. UI Styling
         const card = document.getElementById('errorCard');
         const dot = document.getElementById('statusDot');
         const txt = document.getElementById('errText');
-        
+
+        uEl('errText', isError ? "Warning Alert" : "System Secure");
         card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
+
+        
         dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
         txt.className = isError ? "text-xl font-black text-red-500 uppercase italic" : "text-xl font-black text-emerald-500 uppercase italic";
-        
-        // Simpan SEMUA data error ke state
-        Object.assign(window.bmsState, { 
-            err:errCode, e1:pkt[2], e2:pkt[3], e3:pkt[4], e4:pkt[5], e5:pkt[6] 
-        });
+                
 
         processTelemetry(window.bmsState);
     }
-    uEl('lastSync', new Date().toLocaleTimeString());
+
+    uEl('lastSync', now);
 }
 
         // 6. BLUETOOTH CORE
@@ -294,9 +320,9 @@
             
             // Loop polling yang tidak akan menumpuk (stack)
             const poll = async () => {
-                await sendCmd('VA'); await new Promise(r => setTimeout(r, 500));
-                await sendCmd('PT'); await new Promise(r => setTimeout(r, 500));
-                await sendCmd('ER'); await new Promise(r => setTimeout(r, 1000));
+                await sendCmd('VA'); await new Promise(r => setTimeout(r, 1000));
+                await sendCmd('PT'); await new Promise(r => setTimeout(r, 1000));
+                await sendCmd('ER'); await new Promise(r => setTimeout(r, 2000));
                 setTimeout(poll, 100);
             };
             poll();
