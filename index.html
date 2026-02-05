@@ -125,6 +125,22 @@
         let isSyncing = false;
 
 
+         const errorDict = {
+             0: "Sistem Normal",
+             1: "Tegangan Sel di Bawah Ambang Batas (2.5V)",
+             3: "Kesalahan Penulisan/Pembacaan Memori EEPROM",
+             4: "Proteksi Suhu: Terdeteksi Anomali Suhu Operasional",
+             5: "Aktivasi Sistem Trip: Gagal Reaktivasi Deteksi Arus Terpasang",
+             6: "Terdeteksi Hubungan Arus Pendek (Short Circuit)",
+             7: "Proteksi Arus Berlebih (Overcurrent Detected)",
+             8: "Tegangan Baterai Sangat Rendah: Diperlukan Pengisian Daya",
+             9: "Proteksi Pengisian: Tegangan Melebihi Batas Aman",
+            10: "Tegangan Baterai Rendah: Diperlukan Pengisian Daya",
+            11: "Kapasitas Rendah: Kurangi Beban"
+            };
+
+
+        
         window.bmsState = { 
            v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, 
            tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
@@ -219,9 +235,15 @@ function parse(pkt, head) {
         const errCode = pkt[1];
         const isError = errCode > 0;
 
-        // 1. Voice Alert
-        if (isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
-        if (!isError && window.bmsState.err > 0) speak("System Secure.");
+
+        // --- Perbaikan Voice Alert ---
+        if (isError && window.bmsState.err === 0) {
+            const errorMsg = errorDict[errCode] || "Security Alert";
+            speak("Peringatan. " + errorMsg);
+        } else if (!isError && window.bmsState.err > 0) {
+            speak("System Aman.");
+        }
+    
 
         // 2. Logic Shift Register (E1-E5) & Timestamp
         // Kita loop terbalik agar pendeteksian pergeseran akurat
