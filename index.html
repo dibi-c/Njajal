@@ -143,7 +143,7 @@
         
         window.bmsState = { 
            v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, 
-           tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
+           tB:0, tM:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
            err:0, err_time:"", e1:0, e1_time:"", e2:0, e2_time:"", e3:0, e3_time:"", e4:0, e4_time:"", e5:0, e5_time:"" 
         };
 
@@ -155,9 +155,8 @@
 
         // 3. VOICE ENGINE
         function speak(msg) {
-        window.speechSynthesis.cancel(); // Hentikan suara sebelumnya sebelum bicara baru
         const utterance = new SpeechSynthesisUtterance(msg);
-        utterance.lang = 'en-US';
+        utterance.lang = 'id-ID';
         utterance.rate = 0.9;
         window.speechSynthesis.speak(utterance);
        }
@@ -226,7 +225,7 @@ function parse(pkt, head) {
         relay('rChg', f[5]); relay('rDis', f[6]);
 
         Object.assign(window.bmsState, {
-            tM: f[0], tB: f[1], ahN: f[2], cChg: f[3], cDis: f[4],
+            tB: f[0], tM: f[1], ahN: f[2], cChg: f[3], cDis: f[4],
             rC: f[5], rD: f[6], soh: f[7], wP: f[8], wN: f[9], cyc: f[10], uP: f[11]
         });
         processTelemetry(window.bmsState);
