@@ -114,58 +114,44 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getDatabase, ref, set, push } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
-        // 1. DATABASE & STATE
+        // --- 1. STATE & DB ---
         const db = new Dexie("BMS_Headless_DB");
         db.version(1).stores({ logs: '++id, ts, synced' });
 
         let rtdb = null;
-        let rxChar, txChar;
+        let bluetoothDevice = null;
+        let txChar, rxChar;
         let buffer = new Uint8Array(0);
         let lastSampleTime = 0;
         let isSyncing = false;
+        let pollActive = false;
 
-
-         const errorDict = {
-             0: "Sistem Normal",
-             1: "Tegangan Sel di Bawah Ambang Batas (2.5V)",
-             3: "Kesalahan Penulisan/Pembacaan Memori EEPROM",
-             4: "Proteksi Suhu: Terdeteksi Anomali Suhu Operasional",
-             5: "Aktivasi Sistem Trip: Gagal Reaktivasi Deteksi Arus Terpasang",
-             6: "Terdeteksi Hubungan Arus Pendek (Short Circuit)",
-             7: "Proteksi Arus Berlebih (Overcurrent Detected)",
-             8: "Tegangan Baterai Sangat Rendah: Diperlukan Pengisian Daya",
-             9: "Proteksi Pengisian: Tegangan Melebihi Batas Aman",
-            10: "Tegangan Baterai Rendah: Diperlukan Pengisian Daya",
-            11: "Kapasitas Rendah: Kurangi Beban"
-            };
-
-
-        
         window.bmsState = { 
            v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, 
-           tB:0, tM:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
+           tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
            err:0, err_time:"", e1:0, e1_time:"", e2:0, e2_time:"", e3:0, e3_time:"", e4:0, e4_time:"", e5:0, e5_time:"" 
         };
 
-        // 2. FIREBASE INIT
+        // --- 2. FIREBASE INIT ---
         const saved = localStorage.getItem('bms_v48_cloud');
         if(saved) {
-            try { rtdb = getDatabase(initializeApp(JSON.parse(saved))); } catch(e) { console.error("FB Fail"); }
+            try { rtdb = getDatabase(initializeApp(JSON.parse(saved))); } catch(e) { console.error("Firebase Init Fail"); }
         }
 
-        // 3. VOICE ENGINE
+        // --- 3. VOICE ENGINE ---
         function speak(msg) {
-        const utterance = new SpeechSynthesisUtterance(msg);
-        utterance.lang = 'id-ID';
-        utterance.rate = 0.9;
-        window.speechSynthesis.speak(utterance);
-       }
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(msg);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
 
-        // 4. DATA PROCESSING
+        // --- 4. DATA LOGGING ---
         async function processTelemetry(data) {
             const ts = Date.now();
             if(navigator.onLine && rtdb) {
-                set(ref(rtdb, 'bms_live'), { ...data, ts });
+                set(ref(rtdb, 'bms_live'), { ...data, ts }).catch(() => {});
             }
 
             if (ts - lastSampleTime >= 3000) {
@@ -181,130 +167,119 @@
             isSyncing = true;
             try {
                 const logs = await db.logs.where('synced').equals(0).limit(10).toArray();
-                for(let log of logs) {
-                    const {id, synced, ...payload} = log;
-                    await push(ref(rtdb, 'bms_history'), payload);
-                    await db.logs.delete(id);
+                if(logs.length > 0) {
+                    for(let log of logs) {
+                        const {id, synced, ...payload} = log;
+                        await push(ref(rtdb, 'bms_history'), payload);
+                        await db.logs.delete(id);
+                    }
                 }
             } catch(e) {}
             isSyncing = false;
             updateSyncBadge();
         }
 
-    // --- 5. PARSER (FIXED: FULL 29 PARAMETERS) ---
-function parse(pkt, head) {
-    const data = pkt.slice(1, -1);
-    const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    const f = [];
-    const now = new Date().toLocaleTimeString('id-ID', { hour12: false });
+        // --- 5. PARSER ---
+        function parse(pkt, head) {
+            const data = pkt.slice(1, -1);
+            const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            const f = [];
+            const now = new Date().toLocaleTimeString('id-ID', { hour12: false });
 
-    // Ambil semua float yang tersedia (Kecuali paket EE yang isinya Byte)
-    if (head !== 0xEE) {
-        for (let i = 0; i + 4 <= data.length; i += 4) f.push(dv.getFloat32(i, true));
-    }
-
-    if (head === 0xAA) { // Paket VA (Voltage & Ampere)
-        uEl('vTotal', f[0].toFixed(2) + 'V');
-        uEl('v1', f[1].toFixed(2)); uEl('v2', f[2].toFixed(2));
-        uEl('v3', f[3].toFixed(2)); uEl('v4', f[4].toFixed(2));
-        uEl('current', f[5].toFixed(2)); uEl('power', f[6].toFixed(0));
-        uEl('ahDesign', f[7].toFixed(1)); uEl('soc', f[8].toFixed(0));
-        uEl('whNow', f[9].toFixed(0)); uEl('whDesign', f[10].toFixed(0));
-
-        Object.assign(window.bmsState, {
-            v: f[0], v1: f[1], v2: f[2], v3: f[3], v4: f[4],
-            a: f[5], p: f[6], ahD: f[7], soc: f[8], whN: f[9], whD: f[10]
-        });
-        processTelemetry(window.bmsState);
-    } 
-    else if (head === 0xCC) { // Paket PT (Power & Temp)
-        uEl('tMos', f[0].toFixed(1) + '°C'); uEl('tBatt', f[1].toFixed(1) + '°C');
-        uEl('ahNow', f[2].toFixed(1));
-        uEl('capChg', f[3].toFixed(2) + ' Ah'); uEl('capDis', f[4].toFixed(2) + ' Ah');
-        uEl('soh', f[7].toFixed(0) + '%');
-        relay('rChg', f[5]); relay('rDis', f[6]);
-
-        Object.assign(window.bmsState, {
-            tB: f[0], tM: f[1], ahN: f[2], cChg: f[3], cDis: f[4],
-            rC: f[5], rD: f[6], soh: f[7], wP: f[8], wN: f[9], cyc: f[10], uP: f[11]
-        });
-        processTelemetry(window.bmsState);
-    } 
-    else if (head === 0xEE) { // Paket Security
-        const errCode = pkt[1];
-        const isError = errCode > 0;
-
-
-        // --- Perbaikan Voice Alert ---
-        if (isError && window.bmsState.err === 0) {
-            const errorMsg = errorDict[errCode] || "Security Alert";
-            speak("Peringatan. " + errorMsg);
-        } else if (!isError && window.bmsState.err > 0) {
-            speak("System Aman.");
-        }
-    
-
-        // 2. Logic Shift Register (E1-E5) & Timestamp
-        // Kita loop terbalik agar pendeteksian pergeseran akurat
-        for (let i = 5; i >= 1; i--) {
-            const key = `e${i}`;
-            const newVal = pkt[i + 1]; // pkt[2]=e1, pkt[3]=e2...
-            const prevKey = i > 1 ? `e${i - 1}` : null;
-
-            if (window.bmsState[key] !== newVal) {
-                if (newVal === 0) {
-                    window.bmsState[key] = 0;
-                    window.bmsState[key + '_time'] = "";
-                } else {
-                    // Jika nilai baru sama dengan nilai di slot sebelumnya, copy timestamp-nya (Geser)
-                    if (prevKey && newVal === window.bmsState[prevKey]) {
-                        window.bmsState[key + '_time'] = window.bmsState[prevKey + '_time'];
-                    } else {
-                        // Jika benar-benar kode error baru/unik
-                        window.bmsState[key + '_time'] = now;
-                    }
-                    window.bmsState[key] = newVal;
-                }
-                // Update UI untuk tiap E
-                uEl(key, newVal); 
+            if (head !== 0xEE) {
+                for (let i = 0; i + 4 <= data.length; i += 4) f.push(dv.getFloat32(i, true));
             }
-        }
 
-        // 3. Update Main Error State
-        if(window.bmsState.err !== errCode) {
-            window.bmsState.err = errCode;
-            window.bmsState.err_time = isError ? now : "";
-        }
-
-        // 4. UI Styling
-        const card = document.getElementById('errorCard');
-        const dot = document.getElementById('statusDot');
-        const txt = document.getElementById('errText');
-
-        uEl('errText', isError ? "Warning Alert" : "System Secure");
-        card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
-
-        
-        dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
-        txt.className = isError ? "text-xl font-black text-red-500 uppercase italic" : "text-xl font-black text-emerald-500 uppercase italic";
+            if (head === 0xAA) { 
+                uEl('vTotal', f[0].toFixed(2) + 'V');
+                uEl('v1', f[1].toFixed(2)); uEl('v2', f[2].toFixed(2));
+                uEl('v3', f[3].toFixed(2)); uEl('v4', f[4].toFixed(2));
+                uEl('current', f[5].toFixed(2)); uEl('power', f[6].toFixed(0));
+                uEl('soc', f[8].toFixed(0));
                 
+                Object.assign(window.bmsState, {
+                    v: f[0], v1: f[1], v2: f[2], v3: f[3], v4: f[4],
+                    a: f[5], p: f[6], ahD: f[7], soc: f[8], whN: f[9], whD: f[10]
+                });
+            } 
+            else if (head === 0xCC) {
+                uEl('tMos', f[0].toFixed(1) + '°C'); uEl('tBatt', f[1].toFixed(1) + '°C');
+                uEl('soh', f[7].toFixed(0) + '%');
+                relay('rChg', f[5]); relay('rDis', f[6]);
 
-        processTelemetry(window.bmsState);
-    }
+                Object.assign(window.bmsState, {
+                    tM: f[0], tB: f[1], ahN: f[2], cChg: f[3], cDis: f[4],
+                    rC: f[5], rD: f[6], soh: f[7], wP: f[8], wN: f[9], cyc: f[10], uP: f[11]
+                });
+            } 
+            else if (head === 0xEE) {
+                const errCode = pkt[1];
+                const isError = errCode > 0;
 
-    uEl('lastSync', now);
-}
+                if (isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
+                if (!isError && window.bmsState.err > 0) speak("System Secure.");
 
-        // 6. BLUETOOTH CORE
+                for (let i = 1; i <= 5; i++) {
+                    const key = `e${i}`;
+                    const val = pkt[i+1];
+                    if(window.bmsState[key] !== val) {
+                        window.bmsState[key] = val;
+                        uEl(key, val > 0 ? val : "-");
+                    }
+                }
+
+                window.bmsState.err = errCode;
+                const card = document.getElementById('errorCard');
+                const dot = document.getElementById('statusDot');
+                uEl('errText', isError ? "Warning Alert" : "System Secure");
+                card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
+                dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
+            }
+            uEl('lastSync', now);
+            processTelemetry(window.bmsState);
+        }
+
+        // --- 6. BLUETOOTH CORE & POLLING ---
+        const sendCmd = async (s) => {
+            if(!txChar || !bluetoothDevice.gatt.connected) return;
+            const c = new Uint8Array([0xBB, s.charCodeAt(0), s.charCodeAt(1), 0xBB ^ s.charCodeAt(0) ^ s.charCodeAt(1)]);
+            try { 
+                await txChar.writeValueWithResponse(c); 
+            } catch(e) { 
+                console.error("Kirim Gagal:", s); 
+            }
+        };
+
+        let secondsPassed = 0;
+        const poll = async () => {
+            if(!pollActive || !bluetoothDevice.gatt.connected) return;
+
+            try {
+                // Perintah utama setiap 1 detik
+                await sendCmd('VA');
+
+                // PT setiap 5 detik
+                if (secondsPassed % 5 === 0) await sendCmd('PT');
+
+                // ER setiap 10 detik
+                if (secondsPassed % 10 === 0) await sendCmd('ER');
+
+                secondsPassed = (secondsPassed + 1) % 60;
+            } catch (err) {
+                console.warn("Poll Cycle Error:", err);
+            } finally {
+                setTimeout(poll, 1000);
+            }
+        };
+
         document.getElementById('connectBtn').onclick = async () => {
             try {
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
 
-                const device = await navigator.bluetooth.requestDevice({
-                      acceptAllDevices: true, // Menampilkan semua perangkat BLE yang terdeteksi
-                      optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] // Tetap daftarkan UUID BMS agar bisa diakses
-                       });
-               
-                const server = await device.gatt.connect();
+                const server = await bluetoothDevice.gatt.connect();
                 const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
                 rxChar = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
                 txChar = await service.getCharacteristic('0000ffe2-0000-1000-8000-00805f9b34fb');
@@ -314,66 +289,50 @@ function parse(pkt, head) {
                     let combined = new Uint8Array(buffer.length + chunk.length);
                     combined.set(buffer); combined.set(chunk, buffer.length);
                     buffer = combined;
-                    if(buffer.length > 1024) buffer = buffer.slice(-512);
 
                     while(buffer.length > 0) {
                         const h = buffer[0];
                         let len = (h === 0xAA) ? 46 : (h === 0xCC) ? 50 : (h === 0xEE) ? 8 : 0;
-                        if(len === 0) { buffer = buffer.slice(1); continue; }
+                        if(len === 0 || h < 0xAA) { buffer = buffer.slice(1); continue; }
                         if(buffer.length < len) break;
                         parse(buffer.slice(0, len), h);
                         buffer = buffer.slice(len);
                     }
+                    if(buffer.length > 512) buffer = new Uint8Array(0);
                 });
+
                 await rxChar.startNotifications();
                 document.getElementById('connectBtn').innerText = "CONNECTED";
-                startSafePolling();
+                document.getElementById('connectBtn').classList.replace('bg-blue-600', 'bg-emerald-600');
+                
+                pollActive = true;
+                poll();
+
                 if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
-            } catch(e) { alert(e.message); }
+                
+                bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+                    pollActive = false;
+                    document.getElementById('connectBtn').innerText = "RECONNECT";
+                    document.getElementById('connectBtn').classList.replace('bg-emerald-600', 'bg-red-600');
+                });
+
+            } catch(e) { 
+                alert("Koneksi Batal: " + e.message); 
+            }
         };
 
-        let secondsPassed = 0;
-        async function startSafePolling() {
-            if(!txChar) return;
-            const sendCmd = async (s) => {
-                const c = new Uint8Array([0xBB, s.charCodeAt(0), s.charCodeAt(1), 0xBB ^ s.charCodeAt(0) ^ s.charCodeAt(1)]);
-                try { await txChar.writeValue(c); } catch(e) {}
-            };
-            
-           
-
-const poll = async () => {
-    // VA dikirim setiap 1 detik
-    await sendCmd('VA');
-
-    // PT dikirim setiap 5 detik
-    if (secondsPassed % 5 === 0 && secondsPassed !== 0) {
-        await sendCmd('PT');
-    }
-
-    // ER dikirim setiap 10 detik
-    if (secondsPassed % 10 === 0 && secondsPassed !== 0) {
-        await sendCmd('ER');
-    }
-
-    secondsPassed++;
-    
-    // Reset counter agar tidak angka tidak terlalu besar (opsional)
-    if (secondsPassed >= 10) secondsPassed = 0;
-
-    setTimeout(poll, 1000); // Jalan lagi setelah 1 detik
-};
-
-poll();
+        // --- 7. UTILS ---
+        function uEl(id, v) { 
+            const e = document.getElementById(id); 
+            if(e && e.innerText !== String(v)) e.innerText = v; 
         }
 
-        // 7. UTILS
-        function uEl(id, v) { const e = document.getElementById(id); if(e && e.innerText !== String(v)) e.innerText = v; }
         function relay(id, v) {
             const e = document.getElementById(id); if(!e) return;
             const isOn = v > 0.5;
-            e.className = isOn ? "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase" : "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase";
+            e.className = isOn ? "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase transition-all" : "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase transition-all";
         }
+
         async function updateSyncBadge() {
             const count = await db.logs.count();
             const b = document.getElementById('syncBadge');
@@ -383,7 +342,10 @@ poll();
 
         window.openCfg = () => document.getElementById('configModal').style.display = 'flex';
         window.closeCfg = () => document.getElementById('configModal').style.display = 'none';
-        window.saveCfg = () => { localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); location.reload(); };
+        window.saveCfg = () => { 
+            localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); 
+            location.reload(); 
+        };
     </script>
 </body>
 </html>
