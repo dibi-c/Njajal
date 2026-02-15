@@ -332,6 +332,7 @@ function parse(pkt, head) {
             } catch(e) { alert(e.message); }
         };
 
+        let secondsPassed = 0;
         async function startSafePolling() {
             if(!txChar) return;
             const sendCmd = async (s) => {
@@ -339,14 +340,31 @@ function parse(pkt, head) {
                 try { await txChar.writeValue(c); } catch(e) {}
             };
             
-            // Loop polling yang tidak akan menumpuk (stack)
-            const poll = async () => {
-                await sendCmd('VA'); await new Promise(r => setTimeout(r, 1000));
-                await sendCmd('PT'); await new Promise(r => setTimeout(r, 1000));
-                await sendCmd('ER'); await new Promise(r => setTimeout(r, 2000));
-                setTimeout(poll, 100);
-            };
-            poll();
+           
+
+const poll = async () => {
+    // VA dikirim setiap 1 detik
+    await sendCmd('VA');
+
+    // PT dikirim setiap 5 detik
+    if (secondsPassed % 5 === 0 && secondsPassed !== 0) {
+        await sendCmd('PT');
+    }
+
+    // ER dikirim setiap 10 detik
+    if (secondsPassed % 10 === 0 && secondsPassed !== 0) {
+        await sendCmd('ER');
+    }
+
+    secondsPassed++;
+    
+    // Reset counter agar tidak angka tidak terlalu besar (opsional)
+    if (secondsPassed >= 10) secondsPassed = 0;
+
+    setTimeout(poll, 1000); // Jalan lagi setelah 1 detik
+};
+
+poll();
         }
 
         // 7. UTILS
