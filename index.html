@@ -31,7 +31,7 @@
         <header class="mb-6 flex justify-between items-end px-2">
             <div>
                 <h1 class="text-3xl font-black tracking-tighter text-white uppercase">Core<span class="text-blue-500">.</span>BMS</h1>
-                <p class="label-caps opacity-50 text-blue-400">Security Optimized (v5.8)</p>
+                <p class="label-caps opacity-50 text-blue-400">Security Optimized (v6.0 - Auto Reconnect)</p>
             </div>
             <div class="flex gap-2">
                 <button onclick="openCfg()" class="glass-card !p-3 rounded-xl hover:bg-white/10">⚙️</button>
@@ -123,19 +123,21 @@
         let txChar, rxChar;
         let buffer = new Uint8Array(0);
         let lastSampleTime = 0;
+        let lastDataReceived = Date.now(); // Watchdog Timer
         let isSyncing = false;
         let pollActive = false;
+        let secondsPassed = 0;
 
         window.bmsState = { 
            v:0, v1:0, v2:0, v3:0, v4:0, a:0, p:0, ahD:0, soc:0, whN:0, whD:0, 
            tM:0, tB:0, ahN:0, cChg:0, cDis:0, rC:0, rD:0, soh:0, wP:0, wN:0, cyc:0, uP:0,
-           err:0, err_time:"", e1:0, e1_time:"", e2:0, e2_time:"", e3:0, e3_time:"", e4:0, e4_time:"", e5:0, e5_time:"" 
+           err:0, e1:0, e2:0, e3:0, e4:0, e5:0
         };
 
         // --- 2. FIREBASE INIT ---
         const saved = localStorage.getItem('bms_v48_cloud');
         if(saved) {
-            try { rtdb = getDatabase(initializeApp(JSON.parse(saved))); } catch(e) { console.error("Firebase Init Fail"); }
+            try { rtdb = getDatabase(initializeApp(JSON.parse(saved))); } catch(e) { console.error("Firebase fail"); }
         }
 
         // --- 3. VOICE ENGINE ---
@@ -150,6 +152,8 @@
         // --- 4. DATA LOGGING ---
         async function processTelemetry(data) {
             const ts = Date.now();
+            lastDataReceived = ts; // Reset Watchdog
+
             if(navigator.onLine && rtdb) {
                 set(ref(rtdb, 'bms_live'), { ...data, ts }).catch(() => {});
             }
@@ -167,12 +171,10 @@
             isSyncing = true;
             try {
                 const logs = await db.logs.where('synced').equals(0).limit(10).toArray();
-                if(logs.length > 0) {
-                    for(let log of logs) {
-                        const {id, synced, ...payload} = log;
-                        await push(ref(rtdb, 'bms_history'), payload);
-                        await db.logs.delete(id);
-                    }
+                for(let log of logs) {
+                    const {id, synced, ...payload} = log;
+                    await push(ref(rtdb, 'bms_history'), payload);
+                    await db.logs.delete(id);
                 }
             } catch(e) {}
             isSyncing = false;
@@ -204,9 +206,7 @@
             } 
             else if (head === 0xCC) {
                 uEl('tMos', f[0].toFixed(1) + '°C'); uEl('tBatt', f[1].toFixed(1) + '°C');
-                uEl('soh', f[7].toFixed(0) + '%');
                 relay('rChg', f[5]); relay('rDis', f[6]);
-
                 Object.assign(window.bmsState, {
                     tM: f[0], tB: f[1], ahN: f[2], cChg: f[3], cDis: f[4],
                     rC: f[5], rD: f[6], soh: f[7], wP: f[8], wN: f[9], cyc: f[10], uP: f[11]
@@ -214,70 +214,58 @@
             } 
             else if (head === 0xEE) {
                 const errCode = pkt[1];
-                const isError = errCode > 0;
-
-                if (isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
-                if (!isError && window.bmsState.err > 0) speak("System Secure.");
-
-                for (let i = 1; i <= 5; i++) {
-                    const key = `e${i}`;
-                    const val = pkt[i+1];
-                    if(window.bmsState[key] !== val) {
-                        window.bmsState[key] = val;
-                        uEl(key, val > 0 ? val : "-");
-                    }
-                }
-
+                if (errCode > 0 && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
+                if (errCode === 0 && window.bmsState.err > 0) speak("System Secure.");
+                
                 window.bmsState.err = errCode;
-                const card = document.getElementById('errorCard');
-                const dot = document.getElementById('statusDot');
-                uEl('errText', isError ? "Warning Alert" : "System Secure");
-                card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
-                dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
+                uEl('errText', errCode > 0 ? "Warning Alert" : "System Secure");
+                document.getElementById('statusDot').className = errCode > 0 ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
+                
+                for(let i=1; i<=5; i++) uEl(`e${i}`, pkt[i+1] > 0 ? pkt[i+1] : "-");
             }
             uEl('lastSync', now);
             processTelemetry(window.bmsState);
         }
 
-        // --- 6. BLUETOOTH CORE & POLLING ---
+        // --- 6. BLUETOOTH CORE & AUTO RECONNECT ---
         const sendCmd = async (s) => {
-            if(!txChar || !bluetoothDevice.gatt.connected) return;
+            if(!txChar || !bluetoothDevice?.gatt?.connected) return;
             const c = new Uint8Array([0xBB, s.charCodeAt(0), s.charCodeAt(1), 0xBB ^ s.charCodeAt(0) ^ s.charCodeAt(1)]);
-            try { 
-                await txChar.writeValueWithResponse(c); 
-            } catch(e) { 
-                console.error("Kirim Gagal:", s); 
-            }
+            try { await txChar.writeValueWithResponse(c); } catch(e) {}
         };
 
-        let secondsPassed = 0;
         const poll = async () => {
-            if(!pollActive || !bluetoothDevice.gatt.connected) return;
+            // Watchdog: Cek apakah data macet (>15 detik)
+            if (pollActive && (Date.now() - lastDataReceived > 15000)) {
+                console.warn("Watchdog trigger: No data. Reconnecting...");
+                handleDisconnect();
+                return;
+            }
+
+            if(!pollActive || !bluetoothDevice?.gatt?.connected) return;
 
             try {
-                // Perintah utama setiap 1 detik
                 await sendCmd('VA');
-
-                // PT setiap 5 detik
                 if (secondsPassed % 5 === 0) await sendCmd('PT');
-
-                // ER setiap 10 detik
                 if (secondsPassed % 10 === 0) await sendCmd('ER');
-
                 secondsPassed = (secondsPassed + 1) % 60;
-            } catch (err) {
-                console.warn("Poll Cycle Error:", err);
-            } finally {
+            } catch (err) {} 
+            finally {
                 setTimeout(poll, 1000);
             }
         };
 
-        document.getElementById('connectBtn').onclick = async () => {
+        async function connect() {
             try {
-                bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
-                });
+                if (!bluetoothDevice) {
+                    bluetoothDevice = await navigator.bluetooth.requestDevice({
+                        acceptAllDevices: true,
+                        optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                    });
+                    bluetoothDevice.addEventListener('gattserverdisconnected', handleDisconnect);
+                }
+
+                if (bluetoothDevice.gatt.connected) return;
 
                 const server = await bluetoothDevice.gatt.connect();
                 const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
@@ -302,37 +290,45 @@
                 });
 
                 await rxChar.startNotifications();
-                document.getElementById('connectBtn').innerText = "CONNECTED";
-                document.getElementById('connectBtn').classList.replace('bg-blue-600', 'bg-emerald-600');
                 
                 pollActive = true;
-                poll();
-
-                if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+                lastDataReceived = Date.now();
+                const btn = document.getElementById('connectBtn');
+                btn.innerText = "CONNECTED";
+                btn.className = "bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all shadow-lg shadow-emerald-900/40";
                 
-                bluetoothDevice.addEventListener('gattserverdisconnected', () => {
-                    pollActive = false;
-                    document.getElementById('connectBtn').innerText = "RECONNECT";
-                    document.getElementById('connectBtn').classList.replace('bg-emerald-600', 'bg-red-600');
-                });
+                poll();
+                if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
 
-            } catch(e) { 
-                alert("Koneksi Batal: " + e.message); 
+            } catch(e) {
+                console.error("Connection error", e);
+                document.getElementById('connectBtn').innerText = "FAILED - RETRY";
             }
-        };
+        }
+
+        function handleDisconnect() {
+            pollActive = false;
+            const btn = document.getElementById('connectBtn');
+            btn.innerText = "RECONNECTING...";
+            btn.className = "bg-red-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase animate-pulse transition-all shadow-lg shadow-red-900/40";
+            
+            // Auto reconnect setiap 5 detik
+            setTimeout(() => {
+                if (!pollActive) connect();
+            }, 5000);
+        }
+
+        document.getElementById('connectBtn').onclick = connect;
 
         // --- 7. UTILS ---
         function uEl(id, v) { 
             const e = document.getElementById(id); 
             if(e && e.innerText !== String(v)) e.innerText = v; 
         }
-
         function relay(id, v) {
             const e = document.getElementById(id); if(!e) return;
-            const isOn = v > 0.5;
-            e.className = isOn ? "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase transition-all" : "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase transition-all";
+            e.className = v > 0.5 ? "status-on text-[9px] font-black py-2 rounded-lg text-center border uppercase transition-all" : "status-off text-[9px] font-black bg-white/5 py-2 rounded-lg text-center border border-white/5 uppercase transition-all";
         }
-
         async function updateSyncBadge() {
             const count = await db.logs.count();
             const b = document.getElementById('syncBadge');
@@ -342,10 +338,7 @@
 
         window.openCfg = () => document.getElementById('configModal').style.display = 'flex';
         window.closeCfg = () => document.getElementById('configModal').style.display = 'none';
-        window.saveCfg = () => { 
-            localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); 
-            location.reload(); 
-        };
+        window.saveCfg = () => { localStorage.setItem('bms_v48_cloud', document.getElementById('fbInput').value); location.reload(); };
     </script>
 </body>
 </html>
