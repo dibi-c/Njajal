@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bms-cache-v6.2'; // Naikkan versi ini setiap kali Anda update kode di GitHub
+const CACHE_NAME = 'bms-cache-v6.3'; // Naikkan versi ini setiap kali Anda update kode di GitHub
 const assetsToCache = [
   './',
   './index.html',
