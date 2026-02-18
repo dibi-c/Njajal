@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bms-cache-v6.1'; // Naikkan versi ini setiap kali Anda update kode di GitHub
+const CACHE_NAME = 'bms-cache-v6.0'; // Naikkan versi ini setiap kali Anda update kode di GitHub
 const assetsToCache = [
   './',
   './index.html',
@@ -28,21 +28,26 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Tahap Fetch: Strategi Stale-While-Revalidate
-// Memberikan respon cepat dari cache, tapi tetap memperbarui cache dari network
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
+      
       const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Simpan hasil terbaru ke cache untuk penggunaan berikutnya
-        if (networkResponse && networkResponse.status === 200) {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse.clone());
-          });
+        // CEK: Pastikan respon valid sebelum di-clone dan disimpan
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
         }
-        return networkResponse;
+
+        // PERBAIKAN: Clone dilakukan DI SINI (sebelum dikembalikan)
+        const responseToCache = networkResponse.clone();
+
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+
+        return networkResponse; // Respon asli dikembalikan ke browser
       }).catch(() => {
-        // Jika offline dan tidak ada di cache, bisa arahkan ke halaman offline jika perlu
+        // Opsional: Handle jika benar-benar offline dan tidak ada di cache
       });
 
       return cachedResponse || fetchPromise;
