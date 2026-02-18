@@ -148,24 +148,33 @@
 let newWorker;
 
 if ('serviceWorker' in navigator) {
-    // Registrasi service worker (kita akan buat filenya setelah ini)
-    navigator.serviceWorker.register('/sw.js').then(reg => {
+    // Gunakan './sw.js' (PENTING untuk GitHub Pages)
+    navigator.serviceWorker.register('./sw.js').then(reg => {
         reg.addEventListener('updatefound', () => {
             newWorker = reg.installing;
             newWorker.addEventListener('statechange', () => {
+                // Tombol muncul jika worker baru sudah terinstal tapi yang lama masih aktif
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    // Tampilkan tombol update
-                    document.getElementById('updateToast').classList.remove('hidden');
+                    const toast = document.getElementById('updateToast');
+                    if (toast) toast.classList.remove('hidden');
                 }
             });
         });
     });
 
-    // Eksekusi update saat tombol diklik
-    document.getElementById('updateBtn').onclick = () => {
-        newWorker.postMessage({ action: 'skipWaiting' });
-        window.location.reload();
-    };
+    // Handle klik tombol update
+    const upBtn = document.getElementById('updateBtn');
+    if (upBtn) {
+        upBtn.onclick = () => {
+            if (newWorker) {
+                newWorker.postMessage({ action: 'skipWaiting' });
+            }
+            // Tunggu sebentar agar SW baru aktif, lalu reload
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        };
+    }
 }
 
         // --- 2. FIREBASE INIT ---
