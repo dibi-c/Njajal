@@ -118,7 +118,7 @@
     <button id="updateBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-black text-[10px] uppercase transition-all">
         Update
     </button>
-    </div>
+</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
@@ -237,63 +237,69 @@ if ('serviceWorker' in navigator) {
                 relay('rChg', f[5]); relay('rDis', f[6]);
                 Object.assign(window.bmsState, { tM: f[0], tB: f[1], rC: f[5], rD: f[6] });
             } 
-            else if (head === 0xEE) {
-    const errCode = pkt[1];
-    const isError = errCode > 0;
-    const now = new Date().toLocaleTimeString('id-ID', { hour12: false });
+            else if (head === 0xEE) { // Paket Security
+        const errCode = pkt[1];
+        const isError = errCode > 0;
 
-    // 1. Voice Alert
-    if (isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
-    if (!isError && window.bmsState.err > 0) speak("System Secure.");
+        // 1. Voice Alert
+        if (isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
+        if (!isError && window.bmsState.err > 0) speak("System Secure.");
 
-    // 2. Logic Shift Register (E1-E5) & Timestamp
-    // Salin state lama untuk referensi pergeseran yang akurat
-    const oldState = { ...window.bmsState };
+        // 2. Logic Shift Register (E1-E5) & Timestamp
+        // Kita loop terbalik agar pendeteksian pergeseran akurat
+        for (let i = 5; i >= 1; i--) {
+            const key = `e${i}`;
+            const newVal = pkt[i + 1]; // pkt[2]=e1, pkt[3]=e2...
+            const prevKey = i > 1 ? `e${i - 1}` : null;
 
-    for (let i = 5; i >= 1; i--) {
-        const key = `e${i}`;
-        const newVal = pkt[i + 1]; // pkt[2]=e1, pkt[3]=e2, dst
-        const prevKey = i > 1 ? `e${i - 1}` : null;
-
-        if (window.bmsState[key] !== newVal) {
-            if (newVal === 0) {
-                window.bmsState[key] = 0;
-                window.bmsState[key + '_time'] = "";
-            } else {
-                // Jika nilai baru sama dengan nilai di slot sebelumnya, copy timestamp-nya (Geser)
-                if (prevKey && newVal === oldState[prevKey]) {
-                    window.bmsState[key + '_time'] = oldState[prevKey + '_time'] || now;
+            if (window.bmsState[key] !== newVal) {
+                if (newVal === 0) {
+                    window.bmsState[key] = 0;
+                    window.bmsState[key + '_time'] = "";
                 } else {
-                    // Jika benar-benar kode error baru
-                    window.bmsState[key + '_time'] = now;
+                    // Jika nilai baru sama dengan nilai di slot sebelumnya, copy timestamp-nya (Geser)
+                    if (prevKey && newVal === window.bmsState[prevKey]) {
+                        window.bmsState[key + '_time'] = window.bmsState[prevKey + '_time'];
+                    } else {
+                        // Jika benar-benar kode error baru/unik
+                        window.bmsState[key + '_time'] = now;
+                    }
+                    window.bmsState[key] = newVal;
                 }
-                window.bmsState[key] = newVal;
+                // Update UI untuk tiap E
+                uEl(key, newVal); 
             }
-            // Update UI untuk tiap slot E (e1, e2, dst)
-            uEl(key, newVal > 0 ? newVal : "-");
         }
-    }
 
-    // 3. Update Main Error State
-    window.bmsState.err = errCode;
-    
-    // 4. Update UI Styling
-    uEl('errText', isError ? "Warning Alert" : "System Secure");
-    const dot = document.getElementById('statusDot');
-    if (dot) {
+        // 3. Update Main Error State
+        if(window.bmsState.err !== errCode) {
+            window.bmsState.err = errCode;
+            window.bmsState.err_time = isError ? now : "";
+        }
+
+        // 4. UI Styling
+        const card = document.getElementById('errorCard');
+        const dot = document.getElementById('statusDot');
+        const txt = document.getElementById('errText');
+
+        uEl('errText', isError ? "Warning Alert" : "System Secure");
+        card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
+
+        
         dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
+        txt.className = isError ? "text-xl font-black text-red-500 uppercase italic" : "text-xl font-black text-emerald-500 uppercase italic";
+                
     }
-}
-            uEl('lastSync', now);
-            processTelemetry(window.bmsState);
-        }
+                  uEl('lastSync', now);
+                   processTelemetry(window.bmsState);
+                }
 
-        // --- 4. BLUETOOTH & PERSISTENCE ---
-        const sendCmd = async (s) => {
-            if(!txChar || !bluetoothDevice?.gatt?.connected) return;
-            const c = new Uint8Array([0xBB, s.charCodeAt(0), s.charCodeAt(1), 0xBB ^ s.charCodeAt(0) ^ s.charCodeAt(1)]);
-            try { await txChar.writeValueWithResponse(c); } catch(e) {}
-        };
+                 // --- 4. BLUETOOTH & PERSISTENCE ---
+                 const sendCmd = async (s) => {
+                  if(!txChar || !bluetoothDevice?.gatt?.connected) return;
+                   const c = new Uint8Array([0xBB, s.charCodeAt(0), s.charCodeAt(1), 0xBB ^ s.charCodeAt(0) ^ s.charCodeAt(1)]);
+                   try { await txChar.writeValueWithResponse(c); } catch(e) {}
+                 };
 
         const poll = async () => {
             // Watchdog Timer (15s No Data = Reconnect)
