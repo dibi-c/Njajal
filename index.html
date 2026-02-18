@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORE BMS PRO - Ultra Stability v6.5</title>
+    <title>CORE BMS PRO - Ultra Stability</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
@@ -31,7 +31,7 @@
         <header class="mb-6 flex justify-between items-end px-2">
             <div>
                 <h1 class="text-3xl font-black tracking-tighter text-white uppercase">Core<span class="text-blue-500">.</span>BMS</h1>
-                <p class="label-caps opacity-50 text-blue-400">Industrial Persistence Mode (v6.5)</p>
+                <p class="label-caps opacity-50 text-blue-400">Security Optimized (v6.0 - Auto Reconnect)</p>
             </div>
             <div class="flex gap-2">
                 <button onclick="openCfg()" class="glass-card !p-3 rounded-xl hover:bg-white/10">⚙️</button>
@@ -39,11 +39,21 @@
             </div>
         </header>
 
+         <div id="updateToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 glass-card border-blue-500/50 flex items-center gap-4 z-[200] hidden shadow-2xl">
+    <div class="text-sm">
+        <p class="font-bold text-white">Versi Baru Tersedia!</p>
+        <p class="text-[10px] text-blue-400 uppercase">Perbaharui untuk fitur terbaru</p>
+    </div>
+    <button id="updateBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-black text-[10px] uppercase transition-all">
+        Update
+    </button>
+</div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="glass-card col-span-1 md:col-span-2 row-span-2 flex flex-col justify-center items-center relative overflow-hidden text-center">
+            <div class="glass-card col-span-1 md:col-span-2 row-span-2 flex flex-col justify-center items-center relative overflow-hidden">
                 <div class="absolute top-6 left-8 label-caps">State of Charge</div>
                 <h2 id="soc" class="text-[120px] font-black leading-none text-white tracking-tighter">0</h2>
-                <div class="grid grid-cols-2 gap-4 mt-4 w-full px-6 border-t border-white/5 pt-6">
+                <div class="grid grid-cols-2 gap-4 mt-4 w-full px-6 text-center border-t border-white/5 pt-6">
                     <div><p class="label-caps">Current (A)</p><p id="current" class="value-mono text-2xl font-bold text-orange-400">0.00</p></div>
                     <div><p class="label-caps">Power (W)</p><p id="power" class="value-mono text-2xl font-bold text-blue-400">0</p></div>
                 </div>
@@ -59,9 +69,9 @@
                 </div>
             </div>
 
-            <div id="errorCard" class="glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div id="errorCard" class="glass-card col-span-1 md:col-span-4 border-l-4 border-l-emerald-500 transition-all duration-500 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div id="statusDot" class="h-4 w-4 rounded-full bg-emerald-500 transition-all"></div>
+                    <div id="statusDot" class="h-4 w-4 rounded-full bg-emerald-500"></div>
                     <div>
                         <span class="label-caps">Security Status</span>
                         <h3 id="errText" class="text-xl font-black text-emerald-500 uppercase italic">System Secure</h3>
@@ -101,7 +111,7 @@
 
     <div id="configModal" class="modal">
         <div class="glass-card w-full max-w-xl mx-4 p-8 border-white/10">
-            <h2 class="text-2xl font-black text-white mb-4 uppercase">Cloud Config</h2>
+            <h2 class="text-2xl font-black text-white mb-4 uppercase">Firebase Config</h2>
             <textarea id="fbInput" class="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] text-emerald-400 value-mono mb-4 outline-none"></textarea>
             <div class="grid grid-cols-2 gap-3">
                 <button onclick="saveCfg()" class="bg-blue-600 py-4 rounded-xl font-black text-xs uppercase text-white">Save & Reload</button>
@@ -110,21 +120,11 @@
         </div>
     </div>
 
-    <div id="updateToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 glass-card border-blue-500/50 flex items-center gap-4 z-[200] hidden shadow-2xl">
-    <div class="text-sm">
-        <p class="font-bold text-white">Versi Baru Tersedia!</p>
-        <p class="text-[10px] text-blue-400 uppercase">Perbaharui untuk fitur terbaru</p>
-    </div>
-    <button id="updateBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-black text-[10px] uppercase transition-all">
-        Update
-    </button>
-</div>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getDatabase, ref, set, push } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
-        // --- 1. GLOBALS & STATE ---
+        // --- 1. STATE & DB ---
         const db = new Dexie("BMS_Headless_DB");
         db.version(1).stores({ logs: '++id, ts, synced' });
 
@@ -133,7 +133,7 @@
         let txChar, rxChar;
         let buffer = new Uint8Array(0);
         let lastSampleTime = 0;
-        let lastDataReceived = Date.now();
+        let lastDataReceived = Date.now(); // Watchdog Timer
         let isSyncing = false;
         let pollActive = false;
         let secondsPassed = 0;
@@ -144,7 +144,7 @@
            err:0, e1:0, e2:0, e3:0, e4:0, e5:0
         };
 
-        // --- LOGIKA UPDATE OTOMATIS ---
+         // --- LOGIKA UPDATE OTOMATIS ---
 let newWorker;
 
 if ('serviceWorker' in navigator) {
@@ -168,13 +168,13 @@ if ('serviceWorker' in navigator) {
     };
 }
 
-        // --- 2. INITIALIZATION ---
+        // --- 2. FIREBASE INIT ---
         const saved = localStorage.getItem('bms_v48_cloud');
         if(saved) {
-            try { rtdb = getDatabase(initializeApp(JSON.parse(saved))); } catch(e) { console.error("Firebase Init Fail"); }
+            try { rtdb = getDatabase(initializeApp(JSON.parse(saved))); } catch(e) { console.error("Firebase fail"); }
         }
 
-        // --- 3. CORE FUNCTIONS ---
+        // --- 3. VOICE ENGINE ---
         function speak(msg) {
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(msg);
@@ -183,6 +183,7 @@ if ('serviceWorker' in navigator) {
             window.speechSynthesis.speak(utterance);
         }
 
+        // --- 4. DATA LOGGING ---
         async function processTelemetry(data) {
             const ts = Date.now();
             lastDataReceived = ts; // Reset Watchdog
@@ -214,6 +215,7 @@ if ('serviceWorker' in navigator) {
             updateSyncBadge();
         }
 
+        // --- 5. PARSER ---
         function parse(pkt, head) {
             const data = pkt.slice(1, -1);
             const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -230,81 +232,46 @@ if ('serviceWorker' in navigator) {
                 uEl('v3', f[3].toFixed(2)); uEl('v4', f[4].toFixed(2));
                 uEl('current', f[5].toFixed(2)); uEl('power', f[6].toFixed(0));
                 uEl('soc', f[8].toFixed(0));
-                Object.assign(window.bmsState, { v: f[0], v1: f[1], v2: f[2], v3: f[3], v4: f[4], a: f[5], p: f[6], soc: f[8] });
+                
+                Object.assign(window.bmsState, {
+                    v: f[0], v1: f[1], v2: f[2], v3: f[3], v4: f[4],
+                    a: f[5], p: f[6], ahD: f[7], soc: f[8], whN: f[9], whD: f[10]
+                });
             } 
             else if (head === 0xCC) {
                 uEl('tMos', f[0].toFixed(1) + '°C'); uEl('tBatt', f[1].toFixed(1) + '°C');
                 relay('rChg', f[5]); relay('rDis', f[6]);
-                Object.assign(window.bmsState, { tM: f[0], tB: f[1], rC: f[5], rD: f[6] });
+                Object.assign(window.bmsState, {
+                    tM: f[0], tB: f[1], ahN: f[2], cChg: f[3], cDis: f[4],
+                    rC: f[5], rD: f[6], soh: f[7], wP: f[8], wN: f[9], cyc: f[10], uP: f[11]
+                });
             } 
-            else if (head === 0xEE) { // Paket Security
-        const errCode = pkt[1];
-        const isError = errCode > 0;
-
-        // 1. Voice Alert
-        if (isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
-        if (!isError && window.bmsState.err > 0) speak("System Secure.");
-
-        // 2. Logic Shift Register (E1-E5) & Timestamp
-        // Kita loop terbalik agar pendeteksian pergeseran akurat
-        for (let i = 5; i >= 1; i--) {
-            const key = `e${i}`;
-            const newVal = pkt[i + 1]; // pkt[2]=e1, pkt[3]=e2...
-            const prevKey = i > 1 ? `e${i - 1}` : null;
-
-            if (window.bmsState[key] !== newVal) {
-                if (newVal === 0) {
-                    window.bmsState[key] = 0;
-                    window.bmsState[key + '_time'] = "";
-                } else {
-                    // Jika nilai baru sama dengan nilai di slot sebelumnya, copy timestamp-nya (Geser)
-                    if (prevKey && newVal === window.bmsState[prevKey]) {
-                        window.bmsState[key + '_time'] = window.bmsState[prevKey + '_time'];
-                    } else {
-                        // Jika benar-benar kode error baru/unik
-                        window.bmsState[key + '_time'] = now;
-                    }
-                    window.bmsState[key] = newVal;
-                }
-                // Update UI untuk tiap E
-                uEl(key, newVal); 
-            }
-        }
-
-        // 3. Update Main Error State
-        if(window.bmsState.err !== errCode) {
-            window.bmsState.err = errCode;
-            window.bmsState.err_time = isError ? now : "";
-        }
-
-        // 4. UI Styling
-        const card = document.getElementById('errorCard');
-        const dot = document.getElementById('statusDot');
-        const txt = document.getElementById('errText');
-
-        uEl('errText', isError ? "Warning Alert" : "System Secure");
-        card.style.borderLeftColor = isError ? '#ef4444' : '#10b981';
-
-        
-        dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
-        txt.className = isError ? "text-xl font-black text-red-500 uppercase italic" : "text-xl font-black text-emerald-500 uppercase italic";
+            else if (head === 0xEE) {
+                const errCode = pkt[1];
+                if (errCode > 0 && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
+                if (errCode === 0 && window.bmsState.err > 0) speak("System Secure.");
                 
-    }
-                  uEl('lastSync', now);
-                   processTelemetry(window.bmsState);
-                }
+                window.bmsState.err = errCode;
+                uEl('errText', errCode > 0 ? "Warning Alert" : "System Secure");
+                document.getElementById('statusDot').className = errCode > 0 ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
+                
+                for(let i=1; i<=5; i++) uEl(`e${i}`, pkt[i+1] > 0 ? pkt[i+1] : "-");
+            }
+            uEl('lastSync', now);
+            processTelemetry(window.bmsState);
+        }
 
-                 // --- 4. BLUETOOTH & PERSISTENCE ---
-                 const sendCmd = async (s) => {
-                  if(!txChar || !bluetoothDevice?.gatt?.connected) return;
-                   const c = new Uint8Array([0xBB, s.charCodeAt(0), s.charCodeAt(1), 0xBB ^ s.charCodeAt(0) ^ s.charCodeAt(1)]);
-                   try { await txChar.writeValueWithResponse(c); } catch(e) {}
-                 };
+        // --- 6. BLUETOOTH CORE & AUTO RECONNECT ---
+        const sendCmd = async (s) => {
+            if(!txChar || !bluetoothDevice?.gatt?.connected) return;
+            const c = new Uint8Array([0xBB, s.charCodeAt(0), s.charCodeAt(1), 0xBB ^ s.charCodeAt(0) ^ s.charCodeAt(1)]);
+            try { await txChar.writeValueWithResponse(c); } catch(e) {}
+        };
 
         const poll = async () => {
-            // Watchdog Timer (15s No Data = Reconnect)
+            // Watchdog: Cek apakah data macet (>15 detik)
             if (pollActive && (Date.now() - lastDataReceived > 15000)) {
-                console.warn("Watchdog: Reconnecting...");
+                console.warn("Watchdog trigger: No data. Reconnecting...");
                 handleDisconnect();
                 return;
             }
@@ -353,7 +320,7 @@ if ('serviceWorker' in navigator) {
                         parse(buffer.slice(0, len), h);
                         buffer = buffer.slice(len);
                     }
-                    if(buffer.length > 512) buffer = new Uint8Array(0); // Memory Guard
+                    if(buffer.length > 512) buffer = new Uint8Array(0);
                 });
 
                 await rxChar.startNotifications();
@@ -368,8 +335,8 @@ if ('serviceWorker' in navigator) {
                 if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
 
             } catch(e) {
-                console.error("Link Fail:", e);
-                handleDisconnect(); // Force retry loop
+                console.error("Connection error", e);
+                document.getElementById('connectBtn').innerText = "FAILED - RETRY";
             }
         }
 
@@ -379,7 +346,7 @@ if ('serviceWorker' in navigator) {
             btn.innerText = "RECONNECTING...";
             btn.className = "bg-red-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase animate-pulse transition-all shadow-lg shadow-red-900/40";
             
-            // Loop reconnect abadi setiap 5 detik
+            // Auto reconnect setiap 5 detik
             setTimeout(() => {
                 if (!pollActive) connect();
             }, 5000);
@@ -387,7 +354,7 @@ if ('serviceWorker' in navigator) {
 
         document.getElementById('connectBtn').onclick = connect;
 
-        // --- 5. HELPERS ---
+        // --- 7. UTILS ---
         function uEl(id, v) { 
             const e = document.getElementById(id); 
             if(e && e.innerText !== String(v)) e.innerText = v; 
