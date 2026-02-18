@@ -201,6 +201,13 @@ if ('serviceWorker' in navigator) {
                 set(ref(rtdb, 'bms_live'), { ...data, ts }).catch(() => {});
             }
 
+            // 2. Auto Cleanup Dexie (Hanya simpan 100 log terakhir agar memori lega)
+        const count = await db.logs.count();
+        if (count > 100) {
+            const oldest = await db.logs.orderBy('id').first();
+            await db.logs.delete(oldest.id);
+        }
+
             if (ts - lastSampleTime >= 3000) {
                 lastSampleTime = ts;
                 await db.logs.add({ ts, a:data.a, v:data.v, p:data.p, tM:data.tM, tB:data.tB, synced:0 });
@@ -256,16 +263,53 @@ if ('serviceWorker' in navigator) {
                 });
             } 
             else if (head === 0xEE) {
-                const errCode = pkt[1];
-                if (errCode > 0 && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
-                if (errCode === 0 && window.bmsState.err > 0) speak("System Secure.");
-                
-                window.bmsState.err = errCode;
-                uEl('errText', errCode > 0 ? "Warning Alert" : "System Secure");
-                document.getElementById('statusDot').className = errCode > 0 ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
-                
-                for(let i=1; i<=5; i++) uEl(`e${i}`, pkt[i+1] > 0 ? pkt[i+1] : "-");
+    const errCode = pkt[1];
+    const isError = errCode > 0;
+    const now = new Date().toLocaleTimeString('id-ID', { hour12: false });
+
+    // 1. Voice Alert (Hanya bersuara jika status berubah)
+    if (isError && window.bmsState.err === 0) speak("Warning. Battery Security Alert.");
+    if (!isError && window.bmsState.err > 0) speak("System Secure.");
+
+    // 2. Efficient Shift Register
+    let hasChanged = false;
+    const oldState = { ...window.bmsState };
+
+    for (let i = 5; i >= 1; i--) {
+        const key = `e${i}`;
+        const newVal = pkt[i + 1];
+        const prevKey = i > 1 ? `e${i - 1}` : null;
+
+        if (window.bmsState[key] !== newVal) {
+            hasChanged = true;
+            if (newVal === 0) {
+                window.bmsState[key] = 0;
+                window.bmsState[key + '_time'] = "";
+            } else {
+                // Geser timestamp jika error bergeser slot
+                window.bmsState[key + '_time'] = (prevKey && newVal === oldState[prevKey]) 
+                    ? (oldState[prevKey + '_time'] || now) 
+                    : now;
+                window.bmsState[key] = newVal;
             }
+            uEl(key, newVal > 0 ? newVal : "-");
+        }
+    }
+
+    // 3. Update Global State
+    if (window.bmsState.err !== errCode) {
+        window.bmsState.err = errCode;
+        uEl('errText', isError ? "Warning Alert" : "System Secure");
+        const dot = document.getElementById('statusDot');
+        if(dot) dot.className = isError ? "h-4 w-4 rounded-full bg-red-500 animate-pulse" : "h-4 w-4 rounded-full bg-emerald-500";
+        hasChanged = true;
+    }
+
+    // 4. Kirim ke Firebase HANYA jika ada data berubah (Sangat Hemat Data & CPU)
+    if (hasChanged) {
+        processTelemetry(window.bmsState);
+    }
+}
             uEl('lastSync', now);
             processTelemetry(window.bmsState);
         }
